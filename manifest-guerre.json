@@ -1,0 +1,1 @@
+{"name": "Guerre de Classe", "short_name": "GuerreClasse", "start_url": "./index.html", "scope": "./", "display": "standalone", "background_color": "#0a0a0f", "theme_color": "#0a0a0f", "icons": [{"src": "icone-guerre.png", "sizes": "512x512", "type": "image/png", "purpose": "any"}, {"src": "icone-guerre.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}
