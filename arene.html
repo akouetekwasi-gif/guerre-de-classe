@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>L'Arène des Éléments</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Arene%20des%20Elements","short_name":"Arene","start_url":".","display":"standalone","background_color":"%230a0a0f","theme_color":"%230a0a0f"}'>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0a0f; --bg-panel:#15141f; --bg-card:#1b1826;
+    --red:#ff1744; --pink:#ff2e63; --purple:#b026ff; --gold:#ffb300;
+    --feu:#ff3b30; --air:#7dffb3; --terre:#ffb300; --eau:#00d4ff;
+    --line:#2a2636; --text:#eae7f5; --text-dim:#8b8798;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{margin:0;background:radial-gradient(ellipse at 50% -10%, #2a0a14 0%, transparent 55%),repeating-linear-gradient(0deg, rgba(255,23,68,0.03) 0px, rgba(255,23,68,0.03) 1px, transparent 1px, transparent 3px),var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100dvh;padding-bottom:env(safe-area-inset-bottom);overflow-x:hidden;}
+  h1,h2,h3,.orbi{font-family:'Orbitron',sans-serif;}
+  .ecran{display:none;min-height:100dvh;padding:18px 16px 32px;max-width:560px;margin:0 auto;}
+  .ecran.actif{display:block;animation:fadein .35s ease;}
+  @keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .entete{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .logo{font-size:20px;font-weight:900;letter-spacing:1px;color:var(--red);text-shadow:0 0 12px rgba(255,23,68,.6);}
+  .logo span{color:var(--text);}
+  .pastille{font-size:12px;padding:4px 10px;border-radius:20px;border:1px solid var(--line);color:var(--text-dim);text-decoration:none;}
+  .banniere-mode{text-align:center;font-size:11px;color:var(--text-dim);margin-bottom:14px;}
+  .banniere-mode.connecte{color:#39ff8c;}
+  .banniere-mode.erreur{color:var(--red);}
+  .intro-titre{text-align:center;margin:18px 0 6px;font-size:27px;font-weight:900;color:var(--red);text-shadow:0 0 18px rgba(255,23,68,.55);letter-spacing:1px;}
+  .intro-sous{text-align:center;color:var(--text-dim);margin-bottom:26px;font-size:15px;}
+  label.champ{display:block;font-size:13px;color:var(--text-dim);margin:16px 0 6px;text-transform:uppercase;letter-spacing:1px;}
+  input[type=text],input[type=password]{width:100%;padding:14px;border-radius:10px;border:1px solid var(--line);background:#0e0d15;color:var(--text);font-family:'Rajdhani';font-size:20px;font-weight:700;text-align:center;letter-spacing:4px;}
+  input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 3px rgba(255,23,68,.2);}
+  .bouton-principal{width:100%;margin-top:22px;padding:16px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--red),var(--pink));color:#fff;font-family:'Orbitron';font-weight:800;font-size:15px;letter-spacing:1px;box-shadow:0 6px 24px rgba(255,23,68,.4);cursor:pointer;}
+  .bouton-principal.or{background:linear-gradient(135deg,var(--gold),#8a5700);box-shadow:0 6px 24px rgba(255,179,0,.35);}
+  .bouton-principal:active{transform:scale(.97);}
+  .bouton-principal:disabled{background:#2a2636;color:var(--text-dim);box-shadow:none;}
+  .lien-retour{display:block;text-align:center;margin-top:16px;color:var(--text-dim);font-size:13px;text-decoration:none;}
+  .carte-poste{display:flex;align-items:center;gap:14px;border:2px solid var(--line);background:var(--bg-panel);border-radius:14px;padding:16px;margin-bottom:14px;cursor:pointer;}
+  .carte-poste:active{transform:scale(.98);}
+  .carte-poste .icone{font-size:30px;}
+  .carte-poste .titre{font-family:'Orbitron';font-weight:800;font-size:15px;}
+  .carte-poste .desc{font-size:13px;color:var(--text-dim);margin-top:2px;}
+  .carte-poste.arbitre{border-color:var(--gold);} .carte-poste.arbitre .titre{color:var(--gold);}
+  .carte-poste.joueur{border-color:var(--red);} .carte-poste.joueur .titre{color:var(--red);}
+  .bloc-code{background:var(--bg-panel);border:1px solid var(--gold);border-radius:16px;padding:26px 20px;margin-top:16px;text-align:center;box-shadow:0 0 26px rgba(255,179,0,.15);}
+  .bloc-code h2{color:var(--gold);font-size:18px;margin:0 0 6px;}
+  .bloc-code p{color:var(--text-dim);font-size:14px;margin-bottom:16px;}
+  .erreur-code{color:var(--red);font-size:13px;margin-top:10px;display:none;}
+  .grille-elements{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;}
+  .carte-element{border:2px solid var(--line);background:var(--bg-panel);border-radius:12px;padding:16px 10px;text-align:center;cursor:pointer;}
+  .carte-element .emoji{font-size:28px;}
+  .carte-element .nom{font-family:'Orbitron';font-weight:800;font-size:14px;margin-top:4px;}
+  .carte-element.selection{box-shadow:0 0 16px var(--e-couleur);border-color:var(--e-couleur);background:#221a24;}
+  .banniere-meteo{background:var(--bg-panel);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center;margin-bottom:14px;}
+  .banniere-meteo .emoji{font-size:24px;}
+  .banniere-meteo .nom{font-family:'Orbitron';font-weight:800;font-size:14px;color:var(--gold);}
+  .carte-perso{border-radius:14px;border:1px solid var(--purple);background:var(--bg-card);padding:14px 16px;margin-bottom:14px;box-shadow:0 0 18px rgba(176,38,255,.25) inset;}
+  .ligne-titre{display:flex;justify-content:space-between;align-items:baseline;}
+  .nom-perso{font-family:'Orbitron';font-weight:800;font-size:16px;}
+  .barre{height:13px;border-radius:8px;background:#000;border:1px solid var(--line);overflow:hidden;margin-top:4px;}
+  .barre-remplie{height:100%;border-radius:8px;transition:width .4s ease;}
+  .barre-pv .barre-remplie{background:linear-gradient(90deg,var(--red),var(--pink));box-shadow:0 0 8px rgba(255,23,68,.6);}
+  .barre-mana .barre-remplie{background:linear-gradient(90deg,#1cc8ff,#7dffb3);box-shadow:0 0 8px rgba(28,200,255,.5);}
+  .etiquette{font-size:11px;color:var(--text-dim);margin-top:8px;}
+  .bouclier-actif{display:inline-block;margin-top:6px;font-size:11px;color:var(--gold);}
+  .actions-perso{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;}
+  .btn-action{padding:11px 6px;border:none;border-radius:10px;font-family:'Orbitron';font-weight:800;font-size:12px;color:#fff;background:linear-gradient(135deg,#2a2636,#3a3450);cursor:pointer;}
+  .btn-action.defense{background:linear-gradient(135deg,#1cc8ff,#0a5c8c);}
+  .btn-action.concentration{background:linear-gradient(135deg,#7dffb3,#0a8c4a);}
+  .btn-action:disabled{opacity:.4;}
+  .carte-adversaire{position:relative;border-radius:14px;border:1px solid var(--line);background:var(--bg-card);padding:14px;margin-bottom:12px;overflow:hidden;}
+  .carte-adversaire.eliminee{opacity:.4;filter:grayscale(.8);}
+  .carte-adversaire.impact{animation:flash .4s;}
+  @keyframes flash{0%{background:#3a0d16}100%{background:var(--bg-card)}}
+  .badge-eliminee{position:absolute;top:10px;right:14px;font-size:11px;color:var(--red);font-family:'Orbitron';}
+  .grille-attaques{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+  .btn-attaque{padding:11px 6px;border:none;border-radius:10px;font-family:'Orbitron';font-weight:800;font-size:12px;color:#fff;background:linear-gradient(135deg,#ff1744,#8b0000);cursor:pointer;}
+  .btn-attaque.special{background:linear-gradient(135deg,var(--purple),#4a0a6e);}
+  .btn-attaque:disabled{background:#2a2636;color:var(--text-dim);}
+  .attente{text-align:center;padding:50px 20px;color:var(--text-dim);}
+  .attente .pulse{font-size:19px;font-family:'Orbitron';color:var(--red);animation:pulse 1.4s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .journal{margin-top:18px;border-top:1px solid var(--line);padding-top:12px;}
+  .journal h3{font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:0 0 8px;}
+  .journal-ligne{font-size:13px;color:var(--text-dim);padding:4px 0;border-bottom:1px dashed var(--line);}
+  .journal-ligne b{color:var(--text);}
+  .overlay-victoire{position:fixed;inset:0;background:rgba(5,4,10,.94);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:50;text-align:center;padding:20px;}
+  .overlay-victoire.actif{display:flex;}
+  .overlay-victoire h1{font-size:32px;color:var(--red);text-shadow:0 0 24px var(--red);margin-bottom:10px;}
+  .bloc-arbitre{background:var(--bg-panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
+  .bloc-arbitre h3{margin:0 0 10px;font-size:13px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;}
+  .rangee-joueur-admin{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  .grille-meteo{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .btn-meteo{padding:10px 6px;border-radius:10px;border:2px solid var(--line);background:var(--bg-card);color:var(--text);font-size:12px;font-weight:700;cursor:pointer;}
+  .btn-meteo.actif{border-color:var(--gold);box-shadow:0 0 12px rgba(255,179,0,.4);}
+  .action-globale{width:100%;padding:13px;margin-top:8px;border:none;border-radius:10px;font-family:'Orbitron';font-weight:800;font-size:13px;color:#fff;}
+  .soin{background:linear-gradient(135deg,#39ff8c,#0a8c4a);}
+  .malus{background:linear-gradient(135deg,#ffb300,#8a5700);}
+  .demarrer{background:linear-gradient(135deg,var(--red),var(--pink));}
+  .reset{background:#2a2636;color:var(--text-dim);}
+</style>
+</head>
+<body>
+
+<!-- ECRAN 0 : CODE DE SALON -->
+<div class="ecran actif" id="ecran-salon">
+  <div class="intro-titre">🔥💧 L'ARÈNE DES ÉLÉMENTS 💨🌍</div>
+  <div class="intro-sous">Entre le code du salon donné par ta classe pour rejoindre la même partie.</div>
+  <label class="champ">Code de salon (4 chiffres)</label>
+  <input type="text" id="champ-code-salon" placeholder="0000" maxlength="4" inputmode="numeric">
+  <button class="bouton-principal" onclick="rejoindreSalon()">REJOINDRE LE SALON</button>
+  <div class="banniere-mode" id="banniere-salon"></div>
+</div>
+
+<!-- ECRAN 1 : CHOIX DU POSTE -->
+<div class="ecran" id="ecran-postes">
+  <div class="intro-titre" style="font-size:24px;">Choisis ton poste</div>
+  <div class="intro-sous">Salon <b id="affiche-code-salon"></b></div>
+  <div class="carte-poste arbitre" onclick="allerVersCodeArbitre()">
+    <div class="icone">👑</div>
+    <div><div class="titre">MAÎTRE DU JEU</div><div class="desc">Réservé — accès protégé par code secret</div></div>
+  </div>
+  <div class="carte-poste joueur" onclick="allerVersInscription()">
+    <div class="icone">⚔️</div>
+    <div><div class="titre">JOUEUR</div><div class="desc">2 à 4 joueurs — choisis ton élément (100 PV)</div></div>
+  </div>
+  <div class="banniere-mode" id="banniere-mode-postes"></div>
+</div>
+
+<!-- ECRAN CODE ARBITRE -->
+<div class="ecran" id="ecran-code-arbitre">
+  <div class="bloc-code">
+    <h2>👑 Bienvenue Maître du Jeu Yves</h2>
+    <p>Veuillez entrer votre code d'accès secret.</p>
+    <input type="password" id="champ-code-secret" placeholder="Code d'accès" autocomplete="off">
+    <div class="erreur-code" id="msg-erreur-code">❌ Code incorrect. Accès refusé.</div>
+    <button class="bouton-principal or" onclick="verifierCodeArbitre()">VALIDER L'ACCÈS</button>
+  </div>
+  <a class="lien-retour" href="javascript:void(0)" onclick="changerEcran('ecran-postes')">◀ Changer de poste</a>
+</div>
+
+<!-- ECRAN INSCRIPTION JOUEUR -->
+<div class="ecran" id="ecran-inscription">
+  <div class="intro-titre" style="font-size:22px;">⚔️ Choisis ton élément</div>
+  <label class="champ">Ton pseudo</label>
+  <input type="text" id="champ-pseudo" placeholder="Ex : Kevin.M" maxlength="16">
+  <label class="champ">Ton élément</label>
+  <div class="grille-elements" id="grille-elements"></div>
+  <button class="bouton-principal" onclick="rejoindreCommeJoueur()">ENTRER DANS L'ARÈNE</button>
+  <a class="lien-retour" href="javascript:void(0)" onclick="changerEcran('ecran-postes')">◀ Changer de poste</a>
+</div>
+
+<!-- ECRAN ARENE (joueur) -->
+<div class="ecran" id="ecran-arene">
+  <div class="entete">
+    <div class="logo">⚔ <span id="mon-nom-affiche"></span></div>
+    <div class="pastille" id="statut-connexion-arene"></div>
+  </div>
+  <div id="zone-attente" class="attente" style="display:none;">
+    <div class="pulse">EN ATTENTE DU MAÎTRE DU JEU…</div>
+    <div style="margin-top:8px;font-size:13px;">La bataille n'a pas encore commencé.</div>
+  </div>
+  <div id="zone-jeu" style="display:none;">
+    <div class="banniere-meteo" id="banniere-meteo-arene"></div>
+    <div class="carte-perso" id="carte-moi"></div>
+    <div id="zone-adversaires"></div>
+  </div>
+  <div class="journal"><h3>Journal de bataille</h3><div id="zone-journal"></div></div>
+</div>
+
+<!-- ECRAN ARBITRE -->
+<div class="ecran" id="ecran-arbitre">
+  <div class="entete">
+    <div class="logo">👑 <span>Maître du Jeu Yves</span></div>
+    <a class="pastille" href="javascript:void(0)" onclick="location.reload()">Quitter</a>
+  </div>
+  <div class="banniere-mode" id="statut-connexion-arbitre"></div>
+  <div class="bloc-arbitre">
+    <h3>Salon</h3>
+    <div style="font-family:'Orbitron';font-size:20px;text-align:center;letter-spacing:4px;color:var(--gold);" id="affiche-code-arbitre"></div>
+  </div>
+  <div class="bloc-arbitre">
+    <h3>Contrôle de la partie</h3>
+    <button class="action-globale demarrer" id="btn-demarrer" onclick="demarrerPartie()">🚀 LANCER LA PARTIE</button>
+    <button class="action-globale reset" onclick="reinitialiserPartie()" style="margin-top:8px;">↺ Réinitialiser tout</button>
+  </div>
+  <div class="bloc-arbitre">
+    <h3>Joueurs connectés</h3>
+    <div id="zone-admin-joueurs"></div>
+  </div>
+  <div class="bloc-arbitre">
+    <h3>Météo</h3>
+    <div class="grille-meteo" id="zone-meteo"></div>
+  </div>
+  <div class="bloc-arbitre">
+    <h3>Actions globales</h3>
+    <button class="action-globale soin" onclick="soinGlobal()">💊 Soigner tout le monde (+25 PV)</button>
+    <button class="action-globale malus" onclick="malusGlobal()" style="margin-top:8px;">📚 Interro Surprise (-20 PV à tous)</button>
+  </div>
+  <div class="journal"><h3>Journal de bataille</h3><div id="zone-journal-arbitre"></div></div>
+</div>
+
+<div class="overlay-victoire" id="overlay-victoire">
+  <h1>🏆 VICTOIRE</h1>
+  <div class="orbi" id="texte-victoire" style="font-size:19px;"></div>
+  <button class="bouton-principal" style="max-width:260px;margin-top:24px;" onclick="fermerVictoire()">Fermer</button>
+</div>
+
+<script>
+/* ================= CONFIGURATION ================= */
+const CODE_SECRET_ARBITRE = '30 mars 2005';
+const MQTT_URL = 'wss://broker.hivemq.com:8884/mqtt';
+const PREFIXE = 'areneElementsClasseAkoueteTekwasi2026';
+const PV_MAX = 100, MANA_MAX = 100, MANA_DEPART = 50;
+const CD_ATTAQUE = 3000, CD_ELEMENTAIRE = 6000, CD_DEFENSE = 8000, CD_CONCENTRATION = 5000;
+const COUT_ELEMENTAIRE = 35, COUT_DEFENSE = 15, GAIN_CONCENTRATION = 30;
+const DEGATS_BASIQUE = [10,18], DEGATS_ELEMENTAIRE = [22,32];
+const MAX_JOUEURS = 4;
+
+const ELEMENTS = [
+  {id:'feu',   nom:'FEU',   emoji:'🔥', couleur:'#ff3b30', bat:'air'},
+  {id:'air',   nom:'AIR',   emoji:'💨', couleur:'#7dffb3', bat:'terre'},
+  {id:'terre', nom:'TERRE', emoji:'🌍', couleur:'#ffb300', bat:'eau'},
+  {id:'eau',   nom:'EAU',   emoji:'💧', couleur:'#00d4ff', bat:'feu'},
+];
+function getElement(id){ return ELEMENTS.find(e=>e.id===id) || ELEMENTS[0]; }
+function multiplicateurCycle(attaquant, defenseur){
+  const a = getElement(attaquant);
+  if(a.bat === defenseur) return 1.5;
+  const d = getElement(defenseur);
+  if(d.bat === attaquant) return 0.6;
+  return 1.0;
+}
+const METEOS = [
+  {id:'clair',      nom:'Ciel dégagé',      emoji:'☁️', mult:{feu:1,eau:1,terre:1,air:1}},
+  {id:'canicule',   nom:'Canicule',         emoji:'☀️', mult:{feu:1.5,eau:0.7,terre:1,air:1}},
+  {id:'pluie',      nom:'Pluie battante',   emoji:'🌧️', mult:{feu:0.5,eau:1.5,terre:1,air:1}},
+  {id:'sable',      nom:'Tempête de sable', emoji:'🌪️', mult:{feu:1,eau:1,terre:1.5,air:0.7}},
+  {id:'bourrasque', nom:'Bourrasque',       emoji:'🌬️', mult:{feu:1,eau:1,terre:0.7,air:1.5}},
+  {id:'eclipse',    nom:'Éclipse',          emoji:'🌑', mult:{feu:0.7,eau:0.7,terre:0.7,air:0.7}},
+];
+function getMeteo(id){ return METEOS.find(m=>m.id===id) || METEOS[0]; }
+
+/* ================= ETAT LOCAL ================= */
+let client = null;
+let codeSalon = null;
+let statutConnexion = 'deconnecte';
+let joueurs = {};
+let mj = { demarree:false, meteo:'clair', terminee:false };
+let moi = null;
+let elementChoisi = null;
+let journalLocal = [];
+let victoireAffichee = false;
+const cooldowns = {};
+
+function topicJoueur(id){ return `${PREFIXE}/${codeSalon}/j/${id}`; }
+function topicMJ(){ return `${PREFIXE}/${codeSalon}/mj`; }
+function topicActions(){ return `${PREFIXE}/${codeSalon}/actions`; }
+
+/* ================= CONNEXION MQTT ================= */
+function connecterMQTT(code){
+  codeSalon = code;
+  statutConnexion = 'connexion';
+  majBannieresConnexion();
+  try{
+    client = mqtt.connect(MQTT_URL, { connectTimeout: 8000, reconnectPeriod: 2000 });
+    client.on('connect', ()=>{
+      statutConnexion = 'connecte';
+      majBannieresConnexion();
+      client.subscribe(`${PREFIXE}/${code}/#`);
+      if(moi) publierMonEtat();
+    });
+    client.on('reconnect', ()=>{ statutConnexion='connexion'; majBannieresConnexion(); });
+    client.on('close', ()=>{ statutConnexion='deconnecte'; majBannieresConnexion(); });
+    client.on('error', ()=>{ statutConnexion='erreur'; majBannieresConnexion(); });
+    client.on('message', (topic, payload)=>{ traiterMessage(topic, payload.toString()); });
+  }catch(e){ statutConnexion='erreur'; majBannieresConnexion(); }
+}
+function majBannieresConnexion(){
+  const textes = { connexion:'🟡 Connexion au salon…', connecte:'🟢 Connecté en direct au salon', deconnecte:'⚪ Déconnecté', erreur:'🔴 Connexion impossible' };
+  const classes = { connecte:'connecte', erreur:'erreur' };
+  ['banniere-salon','banniere-mode-postes','statut-connexion-arbitre'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el){ el.textContent = textes[statutConnexion]; el.className = 'banniere-mode ' + (classes[statutConnexion]||''); }
+  });
+  const badge = document.getElementById('statut-connexion-arene');
+  if(badge) badge.textContent = statutConnexion==='connecte' ? '🟢' : (statutConnexion==='erreur' ? '🔴' : '🟡');
+}
+
+function traiterMessage(topic, payloadStr){
+  let data;
+  try{ data = payloadStr ? JSON.parse(payloadStr) : null; }catch(e){ return; }
+  if(topic === topicMJ()){
+    if(data) mj = data;
+    rafraichirEcranActif();
+    verifierVictoire();
+    return;
+  }
+  if(topic === topicActions()){
+    if(!data) return;
+    ajouterJournalLocal(data.texte);
+    if(moi && (data.cible === moi.id || data.cible === 'tous') && data.type !== 'info'){
+      appliquerActionSurMoi(data);
+    }
+    rafraichirEcranActif();
+    return;
+  }
+  const id = topic.split('/').pop();
+  if(data === null){ delete joueurs[id]; } else { joueurs[id] = data; }
+  rafraichirEcranActif();
+  verifierVictoire();
+}
+
+function publierMonEtat(){
+  if(!client || !moi || statutConnexion!=='connecte') return;
+  client.publish(topicJoueur(moi.id), JSON.stringify(joueurs[moi.id]), { retain:true, qos:1 });
+}
+function publierMJ(){
+  if(!client) return;
+  client.publish(topicMJ(), JSON.stringify(mj), { retain:true, qos:1 });
+}
+function publierAction(action){
+  if(!client) return;
+  client.publish(topicActions(), JSON.stringify(action), { qos:1 });
+}
+function ajouterJournalLocal(texte){
+  if(!texte) return;
+  journalLocal.unshift({ t: texte, h: new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) });
+  journalLocal = journalLocal.slice(0,20);
+}
+
+/* ================= ECRAN 0 : SALON ================= */
+function rejoindreSalon(){
+  const code = document.getElementById('champ-code-salon').value.trim();
+  if(!/^[0-9]{4}$/.test(code)){ alert('Entre un code à 4 chiffres.'); return; }
+  connecterMQTT(code);
+  document.getElementById('affiche-code-salon').textContent = code;
+  changerEcran('ecran-postes');
+}
+
+/* ================= ECRAN POSTES ================= */
+function allerVersCodeArbitre(){
+  document.getElementById('champ-code-secret').value='';
+  document.getElementById('msg-erreur-code').style.display='none';
+  changerEcran('ecran-code-arbitre');
+}
+function verifierCodeArbitre(){
+  const saisie = document.getElementById('champ-code-secret').value.trim();
+  if(saisie.toLowerCase() === CODE_SECRET_ARBITRE.toLowerCase()){
+    moi = { id: 'arbitre_'+Date.now(), poste:'arbitre' };
+    document.getElementById('affiche-code-arbitre').textContent = codeSalon;
+    changerEcran('ecran-arbitre');
+  } else {
+    document.getElementById('msg-erreur-code').style.display='block';
+  }
+}
+function allerVersInscription(){
+  if(Object.keys(joueurs).length >= MAX_JOUEURS){ alert('Le salon est déjà complet (4 joueurs max).'); return; }
+  construireGrilleElements();
+  changerEcran('ecran-inscription');
+}
+function construireGrilleElements(){
+  const conteneur = document.getElementById('grille-elements');
+  conteneur.innerHTML = '';
+  ELEMENTS.forEach(e=>{
+    const div = document.createElement('div');
+    div.className = 'carte-element';
+    div.style.setProperty('--e-couleur', e.couleur);
+    div.id = 'choix-'+e.id;
+    div.onclick = ()=>{ elementChoisi = e.id; document.querySelectorAll('.carte-element').forEach(el=>el.classList.remove('selection')); div.classList.add('selection'); };
+    div.innerHTML = `<div class="emoji">${e.emoji}</div><div class="nom" style="color:${e.couleur}">${e.nom}</div>`;
+    conteneur.appendChild(div);
+  });
+}
+function rejoindreCommeJoueur(){
+  const pseudo = document.getElementById('champ-pseudo').value.trim();
+  if(!pseudo){ alert('Entre ton pseudo !'); return; }
+  if(!elementChoisi){ alert('Choisis ton élément !'); return; }
+  moi = { id: pseudo.replace(/\s+/g,'')+'_'+Date.now(), nom:pseudo, element:elementChoisi, poste:'joueur' };
+  joueurs[moi.id] = { nom:pseudo, element:elementChoisi, pv:PV_MAX, pvMax:PV_MAX, mana:MANA_DEPART, bouclierJusqu:0, elimine:false };
+  publierMonEtat();
+  sessionStorage.setItem('moiArene', JSON.stringify(moi));
+  sessionStorage.setItem('codeSalonArene', codeSalon);
+  document.getElementById('mon-nom-affiche').textContent = pseudo;
+  changerEcran('ecran-arene');
+}
+
+/* ================= ACTIONS DE JEU ================= */
+function enCooldown(cle){
+  const dernier = cooldowns[cle] || 0;
+  return Date.now() - dernier;
+}
+function demarrerCooldown(cle){ cooldowns[cle] = Date.now(); }
+
+function attaquer(cibleId, type){
+  if(!moi || moi.poste!=='joueur') return;
+  const cle = type==='elementaire' ? 'elementaire' : 'attaque';
+  const cd = type==='elementaire' ? CD_ELEMENTAIRE : CD_ATTAQUE;
+  if(enCooldown(cle) < cd) return;
+  const moiData = joueurs[moi.id];
+  const cible = joueurs[cibleId];
+  if(!moiData || !cible || cible.elimine) return;
+  if(type==='elementaire' && moiData.mana < COUT_ELEMENTAIRE){ alert('Pas assez de mana !'); return; }
+
+  const plage = type==='elementaire' ? DEGATS_ELEMENTAIRE : DEGATS_BASIQUE;
+  let degats = Math.floor(Math.random()*(plage[1]-plage[0]+1))+plage[0];
+  const mult = multiplicateurCycle(moi.element, cible.element) * getMeteo(mj.meteo).mult[moi.element];
+  degats = Math.round(degats * mult);
+  let bloque = false;
+  if(cible.bouclierJusqu && Date.now() < cible.bouclierJusqu){ degats = Math.round(degats*0.5); bloque = true; }
+
+  if(type==='elementaire'){ moiData.mana -= COUT_ELEMENTAIRE; publierMonEtat(); }
+  demarrerCooldown(cle);
+
+  const eMoi = getElement(moi.element), eCible = getElement(cible.element);
+  const texte = `${moi.nom} ${eMoi.emoji} attaque ${cible.nom} ${eCible.emoji} — ${degats} dégâts${bloque?' (bouclier)':''}${mult>1?' 💥 avantage élémentaire':(mult<1?' (désavantage)':'')}`;
+  publierAction({ de:moi.id, cible:cibleId, degats, texte, type:'degats', ts:Date.now() });
+  if(navigator.vibrate) navigator.vibrate(50);
+  const carte = document.getElementById('carte-'+cibleId);
+  if(carte){ carte.classList.add('impact'); setTimeout(()=>carte.classList.remove('impact'),400); }
+  rafraichirEcranActif();
+}
+function defendre(){
+  if(!moi || moi.poste!=='joueur') return;
+  if(enCooldown('defense') < CD_DEFENSE) return;
+  const moiData = joueurs[moi.id];
+  if(moiData.mana < COUT_DEFENSE){ alert('Pas assez de mana !'); return; }
+  moiData.mana -= COUT_DEFENSE;
+  moiData.bouclierJusqu = Date.now() + 8000;
+  publierMonEtat();
+  demarrerCooldown('defense');
+  publierAction({ de:moi.id, cible:null, texte:`${moi.nom} active un bouclier 🛡️`, type:'info', ts:Date.now() });
+  rafraichirEcranActif();
+}
+function concentrer(){
+  if(!moi || moi.poste!=='joueur') return;
+  if(enCooldown('concentration') < CD_CONCENTRATION) return;
+  const moiData = joueurs[moi.id];
+  if(moiData.mana >= MANA_MAX){ return; }
+  moiData.mana = Math.min(MANA_MAX, moiData.mana + GAIN_CONCENTRATION);
+  publierMonEtat();
+  demarrerCooldown('concentration');
+  publierAction({ de:moi.id, cible:null, texte:`${moi.nom} se concentre et regagne du mana ✨`, type:'info', ts:Date.now() });
+  rafraichirEcranActif();
+}
+function appliquerActionSurMoi(action){
+  const moiData = joueurs[moi.id];
+  if(!moiData) return;
+  if(action.type==='degats'){ moiData.pv = Math.max(0, moiData.pv - action.degats); if(moiData.pv<=0) moiData.elimine=true; }
+  if(action.type==='soin'){ moiData.pv = Math.min(moiData.pvMax, moiData.pv + action.valeur); }
+  if(action.type==='malus'){ moiData.pv = Math.max(0, moiData.pv - action.valeur); if(moiData.pv<=0) moiData.elimine=true; }
+  if(action.type==='reset'){ moiData.pv = PV_MAX; moiData.mana = MANA_DEPART; moiData.elimine=false; moiData.bouclierJusqu=0; }
+  publierMonEtat();
+}
+
+/* ================= AFFICHAGE ARENE ================= */
+function afficherArene(){
+  if(!document.getElementById('ecran-arene').classList.contains('actif')) return;
+  const zoneAttente = document.getElementById('zone-attente');
+  const zoneJeu = document.getElementById('zone-jeu');
+  if(!mj.demarree){ zoneAttente.style.display='block'; zoneJeu.style.display='none'; majJournal('zone-journal'); return; }
+  zoneAttente.style.display='none'; zoneJeu.style.display='block';
+
+  const meteo = getMeteo(mj.meteo);
+  document.getElementById('banniere-meteo-arene').innerHTML = `<span class="emoji">${meteo.emoji}</span> <span class="nom">${meteo.nom}</span>`;
+
+  const moiData = joueurs[moi.id];
+  if(moiData){
+    const e = getElement(moi.element);
+    const pctPv = Math.max(0, Math.round(moiData.pv/moiData.pvMax*100));
+    const pctMana = Math.round(moiData.mana/MANA_MAX*100);
+    const bouclierActif = moiData.bouclierJusqu && Date.now() < moiData.bouclierJusqu;
+    document.getElementById('carte-moi').innerHTML = `
+      <div class="ligne-titre"><div class="nom-perso">${e.emoji} ${moiData.nom} (toi)</div><div style="color:${e.couleur}">${e.nom}</div></div>
+      <div class="etiquette">PV : ${moiData.pv} / ${moiData.pvMax}</div>
+      <div class="barre barre-pv"><div class="barre-remplie" style="width:${pctPv}%"></div></div>
+      <div class="etiquette">Mana : ${moiData.mana} / ${MANA_MAX}</div>
+      <div class="barre barre-mana"><div class="barre-remplie" style="width:${pctMana}%"></div></div>
+      ${bouclierActif ? '<div class="bouclier-actif">🛡️ Bouclier actif</div>' : ''}
+      <div class="actions-perso">
+        <button class="btn-action defense" id="btn-defense" onclick="defendre()">🛡️ Défense</button>
+        <button class="btn-action concentration" id="btn-concentration" onclick="concentrer()">✨ Concentration</button>
+      </div>`;
+  }
+
+  let html = '';
+  Object.keys(joueurs).filter(id=>id!==moi.id).forEach(id=>{
+    const j = joueurs[id];
+    const e = getElement(j.element);
+    const pct = Math.max(0, Math.round(j.pv/j.pvMax*100));
+    const eliminee = j.pv<=0;
+    html += `<div class="carte-adversaire ${eliminee?'eliminee':''}" id="carte-${id}">
+      ${eliminee?'<div class="badge-eliminee">ÉLIMINÉ</div>':''}
+      <div class="ligne-titre"><div class="nom-perso">${e.emoji} ${j.nom}</div><div style="color:${e.couleur}">${e.nom}</div></div>
+      <div class="etiquette">PV : ${j.pv} / ${j.pvMax}</div>
+      <div class="barre barre-pv"><div class="barre-remplie" style="width:${pct}%"></div></div>
+      ${!eliminee && !mj.terminee ? `<div class="grille-attaques">
+        <button class="btn-attaque" id="btn-atk-${id}" onclick="attaquer('${id}','basique')">⚔ Attaque</button>
+        <button class="btn-attaque special" id="btn-elem-${id}" onclick="attaquer('${id}','elementaire')">${e.emoji} Élémentaire</button>
+      </div>` : ''}
+    </div>`;
+  });
+  document.getElementById('zone-adversaires').innerHTML = html || '<div class="etiquette">En attente d\'autres joueurs…</div>';
+  appliquerEtatsBoutons();
+  majJournal('zone-journal');
+}
+function appliquerEtatsBoutons(){
+  const moiData = joueurs[moi.id];
+  if(!moiData) return;
+  const bDef = document.getElementById('btn-defense');
+  if(bDef) bDef.disabled = enCooldown('defense') < CD_DEFENSE || moiData.mana < COUT_DEFENSE;
+  const bCon = document.getElementById('btn-concentration');
+  if(bCon) bCon.disabled = enCooldown('concentration') < CD_CONCENTRATION || moiData.mana >= MANA_MAX;
+  Object.keys(joueurs).forEach(id=>{
+    const bAtk = document.getElementById('btn-atk-'+id);
+    if(bAtk) bAtk.disabled = enCooldown('attaque') < CD_ATTAQUE;
+    const bElem = document.getElementById('btn-elem-'+id);
+    if(bElem) bElem.disabled = enCooldown('elementaire') < CD_ELEMENTAIRE || moiData.mana < COUT_ELEMENTAIRE;
+  });
+}
+function majJournal(idZone){
+  const zone = document.getElementById(idZone);
+  if(!zone) return;
+  zone.innerHTML = journalLocal.slice(0,10).map(j=>`<div class="journal-ligne"><b>${j.h}</b> — ${j.t}</div>`).join('') || '<div class="journal-ligne">Aucun évènement.</div>';
+}
+
+/* ================= ARBITRE ================= */
+function afficherArbitre(){
+  if(!document.getElementById('ecran-arbitre').classList.contains('actif')) return;
+  document.getElementById('btn-demarrer').textContent = mj.demarree ? '✅ Partie en cours' : '🚀 LANCER LA PARTIE';
+  document.getElementById('btn-demarrer').disabled = mj.demarree;
+
+  let html = '';
+  Object.keys(joueurs).forEach(id=>{
+    const j = joueurs[id];
+    const e = getElement(j.element);
+    html += `<div class="rangee-joueur-admin"><div>${e.emoji} <b>${j.nom}</b></div><div>${j.pv}/${j.pvMax} PV · ${j.mana} mana</div></div>`;
+  });
+  document.getElementById('zone-admin-joueurs').innerHTML = html || '<div class="etiquette">Aucun joueur connecté pour l\'instant…</div>';
+
+  let htmlMeteo = '';
+  METEOS.forEach(m=>{
+    htmlMeteo += `<button class="btn-meteo ${mj.meteo===m.id?'actif':''}" onclick="changerMeteo('${m.id}')">${m.emoji} ${m.nom}</button>`;
+  });
+  document.getElementById('zone-meteo').innerHTML = htmlMeteo;
+
+  majJournal('zone-journal-arbitre');
+}
+function demarrerPartie(){
+  if(mj.demarree) return;
+  if(Object.keys(joueurs).length < 2){ alert('Il faut au moins 2 joueurs connectés !'); return; }
+  mj.demarree = true; mj.terminee = false; if(!mj.meteo) mj.meteo='clair';
+  publierMJ();
+  publierAction({ de:'arbitre', cible:null, texte:'🚀 Le Maître du Jeu lance la bataille !', type:'info', ts:Date.now() });
+  afficherArbitre();
+}
+function changerMeteo(id){
+  mj.meteo = id;
+  publierMJ();
+  const m = getMeteo(id);
+  publierAction({ de:'arbitre', cible:null, texte:`${m.emoji} La météo change : ${m.nom} !`, type:'info', ts:Date.now() });
+  afficherArbitre();
+}
+function soinGlobal(){
+  publierAction({ de:'arbitre', cible:'tous', valeur:25, texte:'💊 Le Maître du Jeu soigne tout le monde (+25 PV)', type:'soin', ts:Date.now() });
+}
+function malusGlobal(){
+  publierAction({ de:'arbitre', cible:'tous', valeur:20, texte:'📚 INTERRO SURPRISE ! -20 PV pour tous', type:'malus', ts:Date.now() });
+}
+function reinitialiserPartie(){
+  if(!confirm('Réinitialiser complètement la partie ?')) return;
+  mj = { demarree:false, meteo:'clair', terminee:false };
+  publierMJ();
+  publierAction({ de:'arbitre', cible:'tous', texte:'↺ Le Maître du Jeu réinitialise la partie', type:'reset', ts:Date.now() });
+  victoireAffichee = false;
+  afficherArbitre();
+}
+
+/* ================= VICTOIRE ================= */
+function verifierVictoire(){
+  if(!mj.demarree || victoireAffichee) return;
+  const ids = Object.keys(joueurs);
+  if(ids.length < 2) return;
+  const vivants = ids.filter(id=>!joueurs[id].elimine && joueurs[id].pv>0);
+  if(vivants.length===1){
+    victoireAffichee = true;
+    const g = joueurs[vivants[0]];
+    const e = getElement(g.element);
+    document.getElementById('texte-victoire').textContent = `${g.nom} ${e.emoji} (${e.nom}) remporte le duel !`;
+    document.getElementById('overlay-victoire').classList.add('actif');
+  }
+}
+function fermerVictoire(){ document.getElementById('overlay-victoire').classList.remove('actif'); }
+
+/* ================= NAVIGATION ================= */
+function changerEcran(id){
+  document.querySelectorAll('.ecran').forEach(e=>e.classList.remove('actif'));
+  document.getElementById(id).classList.add('actif');
+  rafraichirEcranActif();
+}
+function rafraichirEcranActif(){
+  majBannieresConnexion();
+  if(document.getElementById('ecran-arene').classList.contains('actif')) afficherArene();
+  if(document.getElementById('ecran-arbitre').classList.contains('actif')) afficherArbitre();
+}
+setInterval(rafraichirEcranActif, 1000);
+
+window.addEventListener('beforeunload', ()=>{
+  if(client && moi && moi.poste==='joueur'){ try{ client.publish(topicJoueur(moi.id), '', { retain:true }); }catch(e){} }
+});
+
+(function initialiser(){
+  const sauvegardeMoi = sessionStorage.getItem('moiArene');
+  const sauvegardeCode = sessionStorage.getItem('codeSalonArene');
+  if(sauvegardeMoi && sauvegardeCode){
+    moi = JSON.parse(sauvegardeMoi);
+    connecterMQTT(sauvegardeCode);
+    if(moi.poste==='joueur'){
+      joueurs[moi.id] = joueurs[moi.id] || { nom:moi.nom, element:moi.element, pv:PV_MAX, pvMax:PV_MAX, mana:MANA_DEPART, bouclierJusqu:0, elimine:false };
+      document.getElementById('mon-nom-affiche').textContent = moi.nom;
+      changerEcran('ecran-arene');
+    }
+  }
+})();
+</script>
+</body>
+</html>
