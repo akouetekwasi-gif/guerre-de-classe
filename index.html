@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Guerre de Classe — Champ de Bataille</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Guerre%20de%20Classe","short_name":"GuerreClasse","start_url":".","display":"standalone","background_color":"%230a0a0f","theme_color":"%230a0a0f"}'>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+<!-- ==== Firebase (facultatif) : n'active la synchro entre appareils que si tu colles ta config plus bas ==== -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#0a0a0f;
+    --bg-panel:#15141f;
+    --bg-card:#1b1826;
+    --red:#ff1744;
+    --pink:#ff2e63;
+    --purple:#b026ff;
+    --gold:#ffb300;
+    --line:#2a2636;
+    --text:#eae7f5;
+    --text-dim:#8b8798;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse at 50% -10%, #2a0a14 0%, transparent 55%),
+      repeating-linear-gradient(0deg, rgba(255,23,68,0.03) 0px, rgba(255,23,68,0.03) 1px, transparent 1px, transparent 3px),
+      var(--bg);
+    color:var(--text);
+    font-family:'Rajdhani',sans-serif;
+    min-height:100dvh;
+    padding-bottom:env(safe-area-inset-bottom);
+    overflow-x:hidden;
+  }
+  h1,h2,h3,.orbi{font-family:'Orbitron',sans-serif;}
+  .ecran{display:none;min-height:100dvh;padding:18px 16px 32px;max-width:560px;margin:0 auto;}
+  .ecran.actif{display:block;animation:fadein .35s ease;}
+  @keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  .entete{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+  .logo{font-size:22px;font-weight:900;letter-spacing:1px;color:var(--red);text-shadow:0 0 12px rgba(255,23,68,.6);}
+  .logo span{color:var(--text);}
+  .pastille{font-size:12px;padding:4px 10px;border-radius:20px;border:1px solid var(--line);color:var(--text-dim);text-decoration:none;}
+  .banniere-mode{text-align:center;font-size:11px;color:var(--text-dim);margin-bottom:14px;letter-spacing:.5px;}
+  .banniere-mode.connecte{color:#39ff8c;}
+
+  /* ===== Ecran des postes ===== */
+  .intro-titre{text-align:center;margin:18px 0 6px;font-size:30px;font-weight:900;color:var(--red);text-shadow:0 0 18px rgba(255,23,68,.55);letter-spacing:1px;}
+  .intro-sous{text-align:center;color:var(--text-dim);margin-bottom:26px;font-size:15px;}
+  .carte-poste{
+    display:flex;align-items:center;gap:14px;border:2px solid var(--line);background:var(--bg-panel);
+    border-radius:14px;padding:16px;margin-bottom:14px;cursor:pointer;transition:.15s;
+  }
+  .carte-poste:active{transform:scale(.98);}
+  .carte-poste .icone{font-size:32px;}
+  .carte-poste .titre{font-family:'Orbitron';font-weight:800;font-size:15px;}
+  .carte-poste .desc{font-size:13px;color:var(--text-dim);margin-top:2px;}
+  .carte-poste.arbitre{border-color:var(--gold);}
+  .carte-poste.arbitre .titre{color:var(--gold);}
+  .carte-poste.commandant{border-color:var(--purple);}
+  .carte-poste.commandant .titre{color:var(--purple);}
+  .carte-poste.soldat{border-color:var(--red);}
+  .carte-poste.soldat .titre{color:var(--red);}
+
+  /* ===== Code secret Maître du Jeu ===== */
+  .bloc-code{background:var(--bg-panel);border:1px solid var(--gold);border-radius:16px;padding:26px 20px;margin-top:24px;text-align:center;box-shadow:0 0 26px rgba(255,179,0,.15);}
+  .bloc-code h2{color:var(--gold);font-size:19px;margin:0 0 6px;}
+  .bloc-code p{color:var(--text-dim);font-size:14px;margin-bottom:18px;}
+  input[type=text],input[type=password]{
+    width:100%;padding:14px 14px;border-radius:10px;border:1px solid var(--line);
+    background:#0e0d15;color:var(--text);font-family:'Rajdhani';font-size:18px;font-weight:600;text-align:center;
+  }
+  input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,179,0,.2);}
+  .erreur-code{color:var(--red);font-size:13px;margin-top:10px;display:none;}
+
+  label.champ{display:block;font-size:13px;color:var(--text-dim);margin:16px 0 6px;text-transform:uppercase;letter-spacing:1px;}
+  .grille-factions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;}
+  .faction-choix{border:2px solid var(--line);background:var(--bg-panel);border-radius:12px;padding:14px 10px;text-align:center;cursor:pointer;transition:.15s;}
+  .faction-choix .nom{font-family:'Orbitron';font-weight:800;font-size:15px;}
+  .faction-choix .cmd{font-size:11px;color:var(--text-dim);margin-top:4px;}
+  .faction-choix.selection{border-color:var(--f-couleur,var(--red));box-shadow:0 0 16px var(--f-couleur,var(--red));background:#221a24;}
+  .faction-choix.complet{opacity:.35;pointer-events:none;}
+
+  .bouton-principal{
+    width:100%;margin-top:24px;padding:16px;border:none;border-radius:12px;
+    background:linear-gradient(135deg,var(--red),var(--pink));color:#fff;font-family:'Orbitron';font-weight:800;
+    font-size:16px;letter-spacing:1px;box-shadow:0 6px 24px rgba(255,23,68,.4);cursor:pointer;
+  }
+  .bouton-principal.or{background:linear-gradient(135deg,var(--gold),#8a5700);box-shadow:0 6px 24px rgba(255,179,0,.35);}
+  .bouton-principal:active{transform:scale(.97);}
+  .lien-retour{display:block;text-align:center;margin-top:18px;color:var(--text-dim);font-size:13px;text-decoration:none;}
+
+  /* ===== Arène ===== */
+  .carte-faction{position:relative;border-radius:14px;border:1px solid var(--line);background:var(--bg-card);padding:14px 16px;margin-bottom:12px;overflow:hidden;transition:.2s;}
+  .carte-faction.mafaction{border-color:var(--purple);box-shadow:0 0 18px rgba(176,38,255,.35) inset;}
+  .carte-faction.eliminee{opacity:.4;filter:grayscale(.8);}
+  .carte-faction.impact{animation:flash .4s;}
+  @keyframes flash{0%{background:#3a0d16}100%{background:var(--bg-card)}}
+  .ligne-titre{display:flex;justify-content:space-between;align-items:baseline;}
+  .nom-faction{font-family:'Orbitron';font-weight:800;font-size:17px;}
+  .infos-faction{font-size:12px;color:var(--text-dim);}
+  .pv-texte{font-family:'Orbitron';font-size:13px;margin:6px 0 4px;color:var(--text-dim);}
+  .barre-pv{height:14px;border-radius:8px;background:#000;border:1px solid var(--line);overflow:hidden;}
+  .barre-pv-remplie{height:100%;border-radius:8px;transition:width .5s ease;box-shadow:0 0 10px rgba(255,23,68,.6);}
+  .attaque-btn{margin-top:10px;width:100%;padding:12px;border:none;border-radius:10px;font-family:'Orbitron';font-weight:800;background:linear-gradient(135deg,#ff1744,#8b0000);color:#fff;letter-spacing:.5px;font-size:14px;cursor:pointer;}
+  .attaque-btn:disabled{background:#2a2636;color:var(--text-dim);}
+  .badge-eliminee{position:absolute;top:10px;right:14px;font-size:11px;color:var(--red);font-family:'Orbitron';letter-spacing:1px;}
+
+  .attente{text-align:center;padding:60px 20px;color:var(--text-dim);}
+  .attente .pulse{font-size:20px;font-family:'Orbitron';color:var(--red);animation:pulse 1.4s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+  .journal{margin-top:20px;border-top:1px solid var(--line);padding-top:12px;}
+  .journal h3{font-size:13px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:0 0 8px;}
+  .journal-ligne{font-size:13px;color:var(--text-dim);padding:4px 0;border-bottom:1px dashed var(--line);}
+  .journal-ligne b{color:var(--text);}
+
+  .overlay-victoire{position:fixed;inset:0;background:rgba(5,4,10,.94);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:50;text-align:center;padding:20px;}
+  .overlay-victoire.actif{display:flex;}
+  .overlay-victoire h1{font-size:34px;color:var(--red);text-shadow:0 0 24px var(--red);margin-bottom:10px;}
+
+  .bloc-arbitre{background:var(--bg-panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
+  .bloc-arbitre h3{margin:0 0 10px;font-size:14px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;}
+  .rangee-faction-admin{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px;}
+  .mini-btns{display:flex;gap:6px;}
+  .mini-btn{width:34px;height:34px;border:none;border-radius:8px;background:var(--bg-card);color:var(--text);font-weight:800;font-size:16px;}
+  .action-globale{width:100%;padding:14px;margin-top:8px;border:none;border-radius:10px;font-family:'Orbitron';font-weight:800;font-size:14px;color:#fff;}
+  .soin{background:linear-gradient(135deg,#39ff8c,#0a8c4a);}
+  .malus{background:linear-gradient(135deg,#ffb300,#8a5700);}
+  .demarrer{background:linear-gradient(135deg,var(--red),var(--pink));}
+  .reset{background:#2a2636;color:var(--text-dim);}
+</style>
+</head>
+<body>
+
+<!-- ============ ECRAN 0 : CHOIX DU POSTE ============ -->
+<div class="ecran actif" id="ecran-postes">
+  <div class="intro-titre">⚔ GUERRE DE CLASSE</div>
+  <div class="intro-sous">Choisis ton poste pour entrer dans l'arène.</div>
+
+  <div class="carte-poste arbitre" onclick="allerVersCodeArbitre()">
+    <div class="icone">👑</div>
+    <div>
+      <div class="titre">MAÎTRE DU JEU / ARBITRE</div>
+      <div class="desc">Réservé — accès protégé par code secret</div>
+    </div>
+  </div>
+
+  <div class="carte-poste commandant" onclick="allerVersInscription('commandant')">
+    <div class="icone">🎖️</div>
+    <div>
+      <div class="titre">COMMANDANT D'ARMÉE</div>
+      <div class="desc">5 places — dirige une des 5 factions (150 PV)</div>
+    </div>
+  </div>
+
+  <div class="carte-poste soldat" onclick="allerVersInscription('soldat')">
+    <div class="icone">⚔️</div>
+    <div>
+      <div class="titre">SOLDAT</div>
+      <div class="desc">Camarade de classe — rejoint l'armée de son choix (100 PV)</div>
+    </div>
+  </div>
+
+  <div class="banniere-mode" id="banniere-mode-postes">Vérification de la connexion…</div>
+</div>
+
+<!-- ============ ECRAN CODE MAÎTRE DU JEU ============ -->
+<div class="ecran" id="ecran-code-arbitre">
+  <div class="bloc-code">
+    <h2>👑 Bienvenue Maître du Jeu Yves</h2>
+    <p>Veuillez entrer votre code d'accès secret.</p>
+    <input type="password" id="champ-code-secret" placeholder="Code d'accès" autocomplete="off">
+    <div class="erreur-code" id="msg-erreur-code">❌ Code incorrect. Accès refusé.</div>
+    <button class="bouton-principal or" onclick="verifierCodeArbitre()">VALIDER L'ACCÈS</button>
+  </div>
+  <a class="lien-retour" href="javascript:void(0)" onclick="changerEcran('ecran-postes')">◀ Changer de poste</a>
+</div>
+
+<!-- ============ ECRAN INSCRIPTION (Soldat / Commandant) ============ -->
+<div class="ecran" id="ecran-inscription">
+  <div class="intro-titre" id="titre-inscription" style="font-size:24px;">⚔️ Rejoindre le combat</div>
+  <div class="intro-sous" id="sous-titre-inscription">Renseigne ton pseudo et choisis ton armée.</div>
+
+  <label class="champ">Ton pseudo</label>
+  <input type="text" id="champ-pseudo" placeholder="Ex : Kevin.M" maxlength="18">
+
+  <label class="champ">Choisis ton armée</label>
+  <div class="grille-factions" id="grille-factions"></div>
+
+  <button class="bouton-principal" onclick="rejoindreCombat()">REJOINDRE LE COMBAT</button>
+  <a class="lien-retour" href="javascript:void(0)" onclick="changerEcran('ecran-postes')">◀ Changer de poste</a>
+</div>
+
+<!-- ============ ECRAN ARENE (joueurs) ============ -->
+<div class="ecran" id="ecran-arene">
+  <div class="entete">
+    <div class="logo">⚔ <span id="mon-nom-affiche"></span></div>
+    <div class="pastille" id="mon-badge-affiche"></div>
+  </div>
+
+  <div id="zone-attente" class="attente" style="display:none;">
+    <div class="pulse">EN ATTENTE DU MAÎTRE DU JEU…</div>
+    <div style="margin-top:8px;font-size:13px;">La bataille n'a pas encore commencé.</div>
+  </div>
+
+  <div id="zone-factions"></div>
+
+  <div class="journal">
+    <h3>Journal de bataille</h3>
+    <div id="zone-journal"></div>
+  </div>
+</div>
+
+<!-- ============ ECRAN PANNEAU ARBITRE ============ -->
+<div class="ecran" id="ecran-arbitre">
+  <div class="entete">
+    <div class="logo">👑 <span>Maître du Jeu Yves</span></div>
+    <a class="pastille" href="javascript:void(0)" onclick="location.reload()">Quitter</a>
+  </div>
+
+  <div class="bloc-arbitre">
+    <h3>Contrôle de la partie</h3>
+    <button class="action-globale demarrer" id="btn-demarrer" onclick="demarrerPartie()">🚀 LANCER LA PARTIE</button>
+    <button class="action-globale reset" onclick="reinitialiserPartie()" style="margin-top:8px;">↺ Réinitialiser tout</button>
+  </div>
+
+  <div class="bloc-arbitre">
+    <h3>État des armées</h3>
+    <div id="zone-admin-factions"></div>
+  </div>
+
+  <div class="bloc-arbitre">
+    <h3>Actions globales</h3>
+    <button class="action-globale soin" onclick="soinGlobal()">💊 Soigner toutes les armées (+25 PV)</button>
+    <button class="action-globale malus" onclick="malusGlobal()" style="margin-top:8px;">📚 Interro Surprise (-20 PV à tous)</button>
+  </div>
+
+  <div class="journal">
+    <h3>Journal de bataille</h3>
+    <div id="zone-journal-arbitre"></div>
+  </div>
+</div>
+
+<!-- ============ VICTOIRE ============ -->
+<div class="overlay-victoire" id="overlay-victoire">
+  <h1>🏆 VICTOIRE</h1>
+  <div class="orbi" id="texte-victoire" style="font-size:20px;"></div>
+  <button class="bouton-principal" style="max-width:260px;margin-top:24px;" onclick="fermerVictoire()">Fermer</button>
+</div>
+
+<script>
+/* =================================================================
+   CONFIGURATION FIREBASE (facultatif)
+   -----------------------------------------------------------------
+   Pour une VRAIE synchro entre plusieurs téléphones :
+   1) Va sur https://console.firebase.google.com → crée un projet gratuit
+   2) Ajoute une "Realtime Database" en mode test
+   3) Récupère la config web (Paramètres du projet → Général → Vos applications)
+   4) Colle-la ci-dessous à la place des valeurs "COLLE_ICI..."
+   Si tu ne touches à rien, l'appli fonctionne quand même en mode local
+   (un seul appareil / plusieurs onglets du même navigateur).
+================================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyCrwlEo4H4TAPhrJJ4bpF_wd8c7S_Myb1A",
+  authDomain: "guerre-de-classe.firebaseapp.com",
+  databaseURL: "https://guerre-de-classe-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "guerre-de-classe",
+  storageBucket: "guerre-de-classe.firebasestorage.app",
+  messagingSenderId: "758210540011",
+  appId: "1:758210540011:web:f95c7ce057a613062469ae"
+};
+
+const CLE_ETAT = 'guerreClasseEtat_v1';
+const CODE_SECRET_ARBITRE = '30 mars 2005';
+const PV_MAX_SOLDAT = 100;
+const PV_MAX_COMMANDANT = 150;
+const COOLDOWN_MS = 4000;
+const DEGATS_SOLDAT = [8,15];
+const DEGATS_COMMANDANT = [20,35];
+
+const FACTIONS_DEF = [
+  {id:'alpha',   nom:'ALPHA',   couleur:'#ff1744'},
+  {id:'beta',    nom:'BETA',    couleur:'#ff8f1c'},
+  {id:'gamma',   nom:'GAMMA',   couleur:'#39ff8c'},
+  {id:'delta',   nom:'DELTA',   couleur:'#1cc8ff'},
+  {id:'epsilon', nom:'EPSILON', couleur:'#b026ff'},
+];
+
+let moi = null;
+let posteChoisi = null;      // 'commandant' | 'soldat'
+let factionChoisie = null;
+let modeFirebase = false;
+let etatCourant = null;
+let refFirebaseEtat = null;
+
+/* =================================================================
+   ETAT PARTAGE
+================================================================= */
+function etatParDefaut(){
+  const factions = {};
+  FACTIONS_DEF.forEach(f=>{
+    factions[f.id] = { nom:f.nom, couleur:f.couleur, commandant:null, soldats:[], pv:0, pvMax:0, eliminee:false };
+  });
+  return { demarree:false, terminee:false, factions, journal:[] };
+}
+
+function initialiserDonnees(){
+  const banniere = document.getElementById('banniere-mode-postes');
+  const configValide = typeof firebase !== 'undefined' && firebaseConfig.apiKey && firebaseConfig.apiKey !== 'COLLE_ICI_TA_CLE';
+
+  if(configValide){
+    try{
+      modeFirebase = true;
+      firebase.initializeApp(firebaseConfig);
+      refFirebaseEtat = firebase.database().ref('etatPartie');
+      refFirebaseEtat.on('value', snap=>{
+        const val = snap.val();
+        etatCourant = val || etatParDefaut();
+        if(!val) refFirebaseEtat.set(etatCourant);
+        banniere.textContent = '🟢 Synchronisé en direct entre tous les appareils';
+        banniere.classList.add('connecte');
+        rafraichirEcranActif();
+      }, ()=>{ banniere.textContent = '⚠️ Connexion au serveur impossible — mode local'; modeFirebase=false; demarrerModeLocal(); });
+    }catch(e){
+      banniere.textContent = '⚠️ Configuration Firebase invalide — mode local';
+      modeFirebase = false;
+      demarrerModeLocal();
+    }
+  } else {
+    banniere.textContent = 'ℹ️ Mode local (un seul appareil / mêmes onglets)';
+    demarrerModeLocal();
+  }
+}
+function demarrerModeLocal(){
+  const brut = localStorage.getItem(CLE_ETAT);
+  etatCourant = brut ? JSON.parse(brut) : etatParDefaut();
+  if(!brut) localStorage.setItem(CLE_ETAT, JSON.stringify(etatCourant));
+  rafraichirEcranActif();
+}
+function lireEtat(){ return etatCourant || etatParDefaut(); }
+function ecrireEtat(etat){
+  etatCourant = etat;
+  if(modeFirebase && refFirebaseEtat){ refFirebaseEtat.set(etat); }
+  else { localStorage.setItem(CLE_ETAT, JSON.stringify(etat)); }
+  rafraichirEcranActif();
+}
+function ajouterJournal(etat, texte){
+  etat.journal.unshift({t:texte, h:new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})});
+  etat.journal = etat.journal.slice(0,25);
+}
+
+window.addEventListener('storage', (e)=>{ if(!modeFirebase && e.key===CLE_ETAT){ etatCourant = JSON.parse(e.newValue); rafraichirEcranActif(); } });
+setInterval(()=>{ if(!modeFirebase) rafraichirEcranActif(); }, 1500);
+
+/* =================================================================
+   ECRAN 0 : CHOIX DU POSTE
+================================================================= */
+function allerVersCodeArbitre(){
+  document.getElementById('champ-code-secret').value='';
+  document.getElementById('msg-erreur-code').style.display='none';
+  changerEcran('ecran-code-arbitre');
+}
+function verifierCodeArbitre(){
+  const saisie = document.getElementById('champ-code-secret').value.trim();
+  if(saisie.toLowerCase() === CODE_SECRET_ARBITRE.toLowerCase()){
+    changerEcran('ecran-arbitre');
+    afficherArbitre();
+  } else {
+    document.getElementById('msg-erreur-code').style.display='block';
+  }
+}
+
+function allerVersInscription(poste){
+  posteChoisi = poste;
+  factionChoisie = null;
+  const titre = document.getElementById('titre-inscription');
+  const sous = document.getElementById('sous-titre-inscription');
+  if(poste==='commandant'){
+    titre.textContent = '🎖️ Devenir Commandant';
+    sous.textContent = 'Choisis l\'armée que tu vas diriger (une place par armée).';
+  } else {
+    titre.textContent = '⚔️ Rejoindre en tant que Soldat';
+    sous.textContent = 'Renseigne ton pseudo et choisis ton armée.';
+  }
+  construireGrilleFactions();
+  changerEcran('ecran-inscription');
+}
+
+function construireGrilleFactions(){
+  const conteneur = document.getElementById('grille-factions');
+  if(!conteneur) return;
+  conteneur.innerHTML = '';
+  const etat = lireEtat();
+  FACTIONS_DEF.forEach(f=>{
+    const donnees = etat.factions[f.id];
+    const complet = posteChoisi==='commandant' && !!donnees.commandant;
+    const div = document.createElement('div');
+    div.className = 'faction-choix' + (complet?' complet':'');
+    div.style.setProperty('--f-couleur', f.couleur);
+    div.id = 'choix-'+f.id;
+    div.onclick = complet ? null : ()=>choisirFaction(f.id);
+    div.innerHTML = `<div class="nom" style="color:${f.couleur}">${f.nom}</div>
+      <div class="cmd">${donnees.commandant ? '⭐ '+donnees.commandant+(complet?' (complet)':'') : 'Commandant libre'}</div>`;
+    conteneur.appendChild(div);
+  });
+}
+function choisirFaction(id){
+  factionChoisie = id;
+  document.querySelectorAll('.faction-choix').forEach(el=>el.classList.remove('selection'));
+  document.getElementById('choix-'+id).classList.add('selection');
+}
+
+function rejoindreCombat(){
+  const pseudo = document.getElementById('champ-pseudo').value.trim();
+  if(!pseudo){ alert('Entre ton pseudo avant de rejoindre le combat !'); return; }
+  if(!factionChoisie){ alert('Choisis une armée !'); return; }
+
+  const etat = lireEtat();
+  const f = etat.factions[factionChoisie];
+
+  if(posteChoisi==='commandant'){
+    if(f.commandant){ alert('Cette armée a déjà un commandant. Choisis une autre armée.'); return; }
+    f.commandant = pseudo;
+  } else {
+    if(!f.soldats.includes(pseudo)) f.soldats.push(pseudo);
+  }
+  ajouterJournal(etat, `${pseudo} a rejoint ${f.nom} (${posteChoisi==='commandant'?'Commandant':'Soldat'})`);
+  ecrireEtat(etat);
+
+  moi = { id: pseudo+'_'+Date.now(), nom: pseudo, faction: factionChoisie, role: posteChoisi };
+  sessionStorage.setItem('moiJoueur', JSON.stringify(moi));
+
+  document.getElementById('mon-nom-affiche').textContent = pseudo;
+  document.getElementById('mon-badge-affiche').textContent = (posteChoisi==='commandant'?'⭐ Commandant · ':'🛡 Soldat · ') + FACTIONS_DEF.find(x=>x.id===factionChoisie).nom;
+
+  changerEcran('ecran-arene');
+  afficherArene();
+}
+
+/* =================================================================
+   ECRAN ARENE (joueur)
+================================================================= */
+function afficherArene(){
+  const etat = lireEtat();
+  const zoneAttente = document.getElementById('zone-attente');
+  const zoneFactions = document.getElementById('zone-factions');
+  if(!document.getElementById('ecran-arene').classList.contains('actif')) return;
+
+  if(!etat.demarree){
+    zoneAttente.style.display='block';
+    zoneFactions.innerHTML='';
+    return;
+  }
+  zoneAttente.style.display='none';
+
+  let html = '';
+  FACTIONS_DEF.forEach(f=>{
+    const d = etat.factions[f.id];
+    const pourcent = d.pvMax>0 ? Math.max(0, Math.round(d.pv/d.pvMax*100)) : 0;
+    const estMaFaction = moi && moi.faction===f.id;
+    const eliminee = d.pv<=0;
+    const peutAttaquer = moi && !estMaFaction && !eliminee && etat.demarree && !etat.terminee;
+    html += `
+      <div class="carte-faction ${estMaFaction?'mafaction':''} ${eliminee?'eliminee':''}" id="carte-${f.id}">
+        ${eliminee?'<div class="badge-eliminee">ÉLIMINÉE</div>':''}
+        <div class="ligne-titre">
+          <div class="nom-faction" style="color:${f.couleur}">${f.nom}</div>
+          <div class="infos-faction">${d.soldats.length} soldat(s) ${d.commandant?'· ⭐ '+d.commandant:''}</div>
+        </div>
+        <div class="pv-texte">${d.pv} / ${d.pvMax} PV</div>
+        <div class="barre-pv"><div class="barre-pv-remplie" style="width:${pourcent}%;background:linear-gradient(90deg, ${f.couleur}, #ff2e63)"></div></div>
+        ${peutAttaquer ? `<button class="attaque-btn" id="btn-att-${f.id}" onclick="attaquer('${f.id}')">⚔ ATTAQUER ${f.nom}</button>` : ''}
+      </div>`;
+  });
+  zoneFactions.innerHTML = html;
+  gererCooldownBoutons();
+
+  document.getElementById('zone-journal').innerHTML = etat.journal.slice(0,10).map(j=>
+    `<div class="journal-ligne"><b>${j.h}</b> — ${j.t}</div>`).join('') || '<div class="journal-ligne">Aucun évènement pour l\'instant.</div>';
+
+  verifierVictoire(etat);
+}
+
+function gererCooldownBoutons(){
+  if(!moi) return;
+  const dernier = parseInt(sessionStorage.getItem('dernierTir_'+moi.id) || '0');
+  const restant = COOLDOWN_MS - (Date.now()-dernier);
+  document.querySelectorAll('.attaque-btn').forEach(btn=>{
+    if(restant>0){
+      btn.disabled = true;
+      btn.textContent = `⏳ Recharge... ${Math.ceil(restant/1000)}s`;
+    }
+  });
+  if(restant>0){
+    setTimeout(()=>{ if(document.getElementById('ecran-arene').classList.contains('actif')) afficherArene(); }, Math.min(restant,1000));
+  }
+}
+
+function attaquer(idFactionCible){
+  if(!moi) return;
+  const dernier = parseInt(sessionStorage.getItem('dernierTir_'+moi.id) || '0');
+  if(Date.now()-dernier < COOLDOWN_MS) return;
+
+  const etat = lireEtat();
+  if(!etat.demarree || etat.terminee) return;
+  const cible = etat.factions[idFactionCible];
+  if(!cible || cible.pv<=0) return;
+
+  const plage = moi.role==='commandant' ? DEGATS_COMMANDANT : DEGATS_SOLDAT;
+  const degats = Math.floor(Math.random()*(plage[1]-plage[0]+1))+plage[0];
+  cible.pv = Math.max(0, cible.pv - degats);
+  if(cible.pv<=0) cible.eliminee = true;
+
+  ajouterJournal(etat, `${moi.nom} (${etat.factions[moi.faction].nom}) inflige <b>${degats} dégâts</b> à ${cible.nom} !`);
+  ecrireEtat(etat);
+
+  sessionStorage.setItem('dernierTir_'+moi.id, Date.now().toString());
+  if(navigator.vibrate) navigator.vibrate(60);
+
+  const carte = document.getElementById('carte-'+idFactionCible);
+  if(carte){ carte.classList.add('impact'); setTimeout(()=>carte.classList.remove('impact'),400); }
+}
+
+function verifierVictoire(etat){
+  if(etat.terminee) return;
+  const vivantes = FACTIONS_DEF.filter(f=>etat.factions[f.id].pv>0 && (etat.factions[f.id].soldats.length>0 || etat.factions[f.id].commandant));
+  const engagees = FACTIONS_DEF.filter(f=>etat.factions[f.id].soldats.length>0 || etat.factions[f.id].commandant);
+  if(etat.demarree && engagees.length>1 && vivantes.length===1){
+    etat.terminee = true;
+    ajouterJournal(etat, `🏆 ${vivantes[0].nom} remporte la Guerre de Classe !`);
+    if(modeFirebase && refFirebaseEtat) refFirebaseEtat.set(etat); else localStorage.setItem(CLE_ETAT, JSON.stringify(etat));
+    document.getElementById('texte-victoire').textContent = `L'armée ${vivantes[0].nom} est victorieuse !`;
+    document.getElementById('overlay-victoire').classList.add('actif');
+  }
+}
+function fermerVictoire(){ document.getElementById('overlay-victoire').classList.remove('actif'); }
+
+/* =================================================================
+   ECRAN ARBITRE (Yves)
+================================================================= */
+function afficherArbitre(){
+  if(!document.getElementById('ecran-arbitre').classList.contains('actif')) return;
+  const etat = lireEtat();
+  document.getElementById('btn-demarrer').textContent = etat.demarree ? '✅ Partie en cours' : '🚀 LANCER LA PARTIE';
+  document.getElementById('btn-demarrer').disabled = etat.demarree;
+
+  let html = '';
+  FACTIONS_DEF.forEach(f=>{
+    const d = etat.factions[f.id];
+    html += `<div class="rangee-faction-admin">
+      <div><b style="color:${f.couleur}">${f.nom}</b><br><span style="font-size:12px;color:var(--text-dim)">${d.pv}/${d.pvMax} PV · ${d.soldats.length} soldat(s) ${d.commandant?'· ⭐'+d.commandant:''}</span></div>
+      <div class="mini-btns">
+        <button class="mini-btn" onclick="ajusterPv('${f.id}',-20)">−</button>
+        <button class="mini-btn" onclick="ajusterPv('${f.id}',20)">+</button>
+      </div>
+    </div>`;
+  });
+  document.getElementById('zone-admin-factions').innerHTML = html;
+
+  document.getElementById('zone-journal-arbitre').innerHTML = etat.journal.slice(0,15).map(j=>
+    `<div class="journal-ligne"><b>${j.h}</b> — ${j.t}</div>`).join('') || '<div class="journal-ligne">Aucun évènement.</div>';
+}
+
+function demarrerPartie(){
+  const etat = lireEtat();
+  if(etat.demarree){ return; }
+  let auMoinsUnJoueur = false;
+  FACTIONS_DEF.forEach(f=>{
+    const d = etat.factions[f.id];
+    d.pvMax = (d.commandant?PV_MAX_COMMANDANT:0) + d.soldats.length*PV_MAX_SOLDAT;
+    d.pv = d.pvMax;
+    d.eliminee = false;
+    if(d.pvMax>0) auMoinsUnJoueur = true;
+  });
+  if(!auMoinsUnJoueur){ alert("Aucun joueur n'a encore rejoint une armée !"); return; }
+  etat.demarree = true;
+  etat.terminee = false;
+  ajouterJournal(etat, '🚀 Le Maître du Jeu lance la bataille !');
+  ecrireEtat(etat);
+  afficherArbitre();
+}
+function reinitialiserPartie(){
+  if(!confirm('Réinitialiser complètement la partie (joueurs, PV, journal) ?')) return;
+  ecrireEtat(etatParDefaut());
+  afficherArbitre();
+}
+function ajusterPv(idFaction, montant){
+  const etat = lireEtat();
+  const f = etat.factions[idFaction];
+  if(f.pvMax<=0) return;
+  f.pv = Math.min(f.pvMax, Math.max(0, f.pv + montant));
+  ajouterJournal(etat, `Le Maître du Jeu ${montant>0?'soigne':'inflige des dégâts à'} ${f.nom} (${montant>0?'+':''}${montant} PV)`);
+  ecrireEtat(etat);
+  afficherArbitre();
+}
+function soinGlobal(){
+  const etat = lireEtat();
+  FACTIONS_DEF.forEach(f=>{ const d = etat.factions[f.id]; if(d.pvMax>0) d.pv = Math.min(d.pvMax, d.pv+25); });
+  ajouterJournal(etat, '💊 Le Maître du Jeu soigne toutes les armées (+25 PV)');
+  ecrireEtat(etat);
+  afficherArbitre();
+}
+function malusGlobal(){
+  const etat = lireEtat();
+  FACTIONS_DEF.forEach(f=>{ const d = etat.factions[f.id]; if(d.pvMax>0) d.pv = Math.max(0, d.pv-20); });
+  ajouterJournal(etat, '📚 INTERRO SURPRISE ! Toutes les armées perdent 20 PV');
+  ecrireEtat(etat);
+  afficherArbitre();
+}
+
+/* =================================================================
+   NAVIGATION / RAFRAICHISSEMENT
+================================================================= */
+function changerEcran(id){
+  document.querySelectorAll('.ecran').forEach(e=>e.classList.remove('actif'));
+  document.getElementById(id).classList.add('actif');
+  rafraichirEcranActif();
+}
+function rafraichirEcranActif(){
+  if(document.getElementById('ecran-arene') && document.getElementById('ecran-arene').classList.contains('actif')) afficherArene();
+  if(document.getElementById('ecran-arbitre') && document.getElementById('ecran-arbitre').classList.contains('actif')) afficherArbitre();
+  if(document.getElementById('ecran-inscription') && document.getElementById('ecran-inscription').classList.contains('actif')) construireGrilleFactions();
+}
+
+(function initialiser(){
+  initialiserDonnees();
+  const sauvegarde = sessionStorage.getItem('moiJoueur');
+  if(sauvegarde){
+    moi = JSON.parse(sauvegarde);
+    document.getElementById('mon-nom-affiche').textContent = moi.nom;
+    document.getElementById('mon-badge-affiche').textContent = (moi.role==='commandant'?'⭐ Commandant · ':'🛡 Soldat · ') + FACTIONS_DEF.find(x=>x.id===moi.faction).nom;
+    changerEcran('ecran-arene');
+  }
+})();
+</script>
+</body>
+</html>
