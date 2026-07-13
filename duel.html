@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>L'Arène des Éléments : Le Choc</title>
+<link rel="manifest" href="manifest-duel.json">
+<link rel="icon" href="icone-duel.png" type="image/png">
+<link rel="apple-touch-icon" href="icone-duel.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0a0f; --bg-panel:#15141f; --bg-card:#1b1826;
+    --red:#ff1744; --pink:#ff2e63; --purple:#b026ff; --gold:#ffb300;
+    --feu:#ff3b30; --air:#7dffb3; --terre:#ffb300; --eau:#00d4ff;
+    --line:#2a2636; --text:#eae7f5; --text-dim:#8b8798;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{margin:0;background:radial-gradient(ellipse at 50% -10%, #2a0a14 0%, transparent 55%),repeating-linear-gradient(0deg, rgba(255,23,68,0.03) 0px, rgba(255,23,68,0.03) 1px, transparent 1px, transparent 3px),var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100dvh;padding-bottom:env(safe-area-inset-bottom);overflow-x:hidden;}
+  h1,h2,h3,.orbi{font-family:'Orbitron',sans-serif;}
+  .ecran{display:none;min-height:100dvh;padding:18px 16px 32px;max-width:520px;margin:0 auto;}
+  .ecran.actif{display:block;animation:fadein .35s ease;}
+  @keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .intro-titre{text-align:center;margin:14px 0 6px;font-size:26px;font-weight:900;color:var(--red);text-shadow:0 0 18px rgba(255,23,68,.55);letter-spacing:1px;}
+  .intro-sous{text-align:center;color:var(--text-dim);margin-bottom:20px;font-size:14px;}
+  label.champ{display:block;font-size:13px;color:var(--text-dim);margin:14px 0 6px;text-transform:uppercase;letter-spacing:1px;}
+  input[type=text]{width:100%;padding:14px;border-radius:10px;border:1px solid var(--line);background:#0e0d15;color:var(--text);font-family:'Rajdhani';font-size:18px;font-weight:700;text-align:center;}
+  input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 3px rgba(255,23,68,.2);}
+  .grille-elements{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;}
+  .carte-element{border:2px solid var(--line);background:var(--bg-panel);border-radius:12px;padding:16px 10px;text-align:center;cursor:pointer;}
+  .carte-element .emoji{font-size:26px;}
+  .carte-element .nom{font-family:'Orbitron';font-weight:800;font-size:13px;margin-top:4px;}
+  .carte-element.selection{box-shadow:0 0 16px var(--e-couleur);border-color:var(--e-couleur);background:#221a24;}
+  .bouton-principal{width:100%;margin-top:14px;padding:16px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--red),var(--pink));color:#fff;font-family:'Orbitron';font-weight:800;font-size:15px;letter-spacing:1px;box-shadow:0 6px 24px rgba(255,23,68,.4);cursor:pointer;}
+  .bouton-principal.secondaire{background:linear-gradient(135deg,#1cc8ff,#0a5c8c);box-shadow:0 6px 24px rgba(28,200,255,.35);}
+  .bouton-principal:disabled{background:#2a2636;color:var(--text-dim);box-shadow:none;}
+  .bouton-principal:active{transform:scale(.97);}
+  .lien-retour{display:block;text-align:center;margin-top:16px;color:var(--text-dim);font-size:13px;text-decoration:none;}
+  .banniere-mode{text-align:center;font-size:11px;color:var(--text-dim);margin-top:14px;}
+  .banniere-mode.connecte{color:#39ff8c;}
+  .banniere-mode.erreur{color:var(--red);}
+  .bloc-code{background:var(--bg-panel);border:1px solid var(--gold);border-radius:16px;padding:26px 20px;margin-top:16px;text-align:center;box-shadow:0 0 26px rgba(255,179,0,.15);}
+  .code-affiche{font-family:'Orbitron';font-size:42px;letter-spacing:10px;color:var(--gold);text-shadow:0 0 18px rgba(255,179,0,.6);margin:10px 0;}
+  .attente{text-align:center;padding:40px 20px;color:var(--text-dim);}
+  .attente .pulse{font-size:18px;font-family:'Orbitron';color:var(--red);animation:pulse 1.4s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .vs-entete{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .carte-joueur{flex:1;border-radius:14px;padding:12px;text-align:center;}
+  .carte-joueur.moi{border:2px solid var(--purple);box-shadow:0 0 14px rgba(176,38,255,.3) inset;}
+  .carte-joueur.adversaire{border:2px solid var(--red);box-shadow:0 0 14px rgba(255,23,68,.3) inset;}
+  .carte-joueur .emoji-elem{font-size:30px;}
+  .carte-joueur .nom-j{font-family:'Orbitron';font-weight:800;font-size:13px;margin-top:2px;}
+  .vs-texte{font-family:'Orbitron';font-weight:900;color:var(--text-dim);font-size:16px;padding:0 8px;}
+  .barre{height:13px;border-radius:8px;background:#000;border:1px solid var(--line);overflow:hidden;margin-top:6px;}
+  .barre-remplie{height:100%;border-radius:8px;transition:width .5s ease;}
+  .barre-pv .barre-remplie{background:linear-gradient(90deg,var(--red),var(--pink));box-shadow:0 0 8px rgba(255,23,68,.6);}
+  .barre-mana .barre-remplie{background:linear-gradient(90deg,#1cc8ff,#7dffb3);box-shadow:0 0 8px rgba(28,200,255,.5);}
+  .etiquette{font-size:11px;color:var(--text-dim);margin-top:4px;}
+  .tour-affiche{text-align:center;font-family:'Orbitron';font-size:13px;color:var(--gold);margin:14px 0 8px;letter-spacing:1px;}
+  .grille-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;}
+  .btn-choix{padding:16px 4px;border:2px solid var(--line);border-radius:12px;background:var(--bg-panel);color:var(--text);font-family:'Orbitron';font-weight:800;font-size:12px;cursor:pointer;text-align:center;}
+  .btn-choix .emoji{font-size:22px;display:block;margin-bottom:4px;}
+  .btn-choix.selection{border-color:var(--gold);box-shadow:0 0 16px rgba(255,179,0,.5);background:#221a24;}
+  .btn-choix:disabled{opacity:.35;}
+  .statut-choix{text-align:center;margin-top:12px;font-size:13px;color:var(--text-dim);}
+  .journal{margin-top:18px;border-top:1px solid var(--line);padding-top:12px;}
+  .journal h3{font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:0 0 8px;}
+  .journal-ligne{font-size:13px;color:var(--text-dim);padding:4px 0;border-bottom:1px dashed var(--line);}
+  .journal-ligne b{color:var(--text);}
+  .overlay-victoire{position:fixed;inset:0;background:rgba(5,4,10,.94);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:50;text-align:center;padding:20px;}
+  .overlay-victoire.actif{display:flex;}
+  .overlay-victoire h1{font-size:32px;color:var(--red);text-shadow:0 0 24px var(--red);margin-bottom:10px;}
+  .impact{animation:flash .4s;}
+  @keyframes flash{0%{background:#3a0d16}100%{background:transparent}}
+</style>
+</head>
+<body>
+
+<!-- ECRAN ACCUEIL -->
+<div class="ecran actif" id="ecran-accueil">
+  <div class="intro-titre">⚔️ LE CHOC ⚔️</div>
+  <div class="intro-sous">Duel 1 contre 1 — Arène des Éléments</div>
+
+  <label class="champ">Ton pseudo</label>
+  <input type="text" id="champ-pseudo" placeholder="Ex : Kevin.M" maxlength="16">
+
+  <label class="champ">Ton élément</label>
+  <div class="grille-elements" id="grille-elements"></div>
+
+  <button class="bouton-principal" onclick="creerSalon()">➕ CRÉER UN SALON</button>
+  <button class="bouton-principal secondaire" onclick="afficherChampRejoindre()">🔑 REJOINDRE UN SALON</button>
+
+  <div id="zone-rejoindre" style="display:none;">
+    <label class="champ">Code de ton pote</label>
+    <input type="text" id="champ-code-rejoindre" placeholder="0000" maxlength="4" inputmode="numeric">
+    <button class="bouton-principal secondaire" onclick="rejoindreSalon()">VALIDER ET REJOINDRE</button>
+  </div>
+
+  <div class="banniere-mode" id="banniere-accueil"></div>
+</div>
+
+<!-- ECRAN ATTENTE -->
+<div class="ecran" id="ecran-attente-salon">
+  <div class="bloc-code">
+    <div style="color:var(--text-dim);font-size:13px;">Donne ce code à ton adversaire</div>
+    <div class="code-affiche" id="affiche-code-attente">----</div>
+    <div class="attente"><div class="pulse">EN ATTENTE DE TON ADVERSAIRE…</div></div>
+  </div>
+  <div class="banniere-mode" id="banniere-attente"></div>
+  <a class="lien-retour" href="javascript:void(0)" onclick="location.reload()">◀ Annuler</a>
+</div>
+
+<!-- ECRAN DUEL -->
+<div class="ecran" id="ecran-duel">
+  <div class="vs-entete">
+    <div class="carte-joueur moi" id="carte-moi"></div>
+    <div class="vs-texte">VS</div>
+    <div class="carte-joueur adversaire" id="carte-adversaire"></div>
+  </div>
+  <div class="tour-affiche" id="affiche-tour">Tour 1</div>
+  <div class="grille-actions" id="grille-actions"></div>
+  <div class="statut-choix" id="statut-choix"></div>
+  <div class="journal"><h3>Journal du duel</h3><div id="zone-journal"></div></div>
+</div>
+
+<div class="overlay-victoire" id="overlay-victoire">
+  <h1 id="titre-victoire">🏆 VICTOIRE</h1>
+  <div class="orbi" id="texte-victoire" style="font-size:18px;"></div>
+  <button class="bouton-principal" style="max-width:240px;margin-top:24px;" onclick="location.reload()">Nouveau duel</button>
+</div>
+
+<script>
+/* ================= CONFIGURATION ================= */
+const MQTT_URL = 'wss://broker.hivemq.com:8884/mqtt';
+const PREFIXE = 'duelElementsChocAkoueteTekwasi2026';
+const PV_MAX = 100, MANA_MAX = 100;
+const DEGATS_BASE = [15,25];
+const MANA_CHARGE = 30, MANA_CHARGE_INTERROMPUE = 15, MANA_DEFENSE = 10, COUT_COUP_CHARGE = 50;
+
+const ELEMENTS = [
+  {id:'feu',   nom:'FEU',   emoji:'🔥', couleur:'#ff3b30', bat:'air'},
+  {id:'air',   nom:'AIR',   emoji:'💨', couleur:'#7dffb3', bat:'terre'},
+  {id:'terre', nom:'TERRE', emoji:'🌍', couleur:'#ffb300', bat:'eau'},
+  {id:'eau',   nom:'EAU',   emoji:'💧', couleur:'#00d4ff', bat:'feu'},
+];
+function getElement(id){ return ELEMENTS.find(e=>e.id===id) || ELEMENTS[0]; }
+function multiplicateurCycle(attaquant, defenseur){
+  const a = getElement(attaquant);
+  if(a.bat === defenseur) return 1.5;
+  const d = getElement(defenseur);
+  if(d.bat === attaquant) return 0.6;
+  return 1.0;
+}
+const ACTIONS = [
+  {id:'attaque', nom:'ATTAQUER', emoji:'⚔️'},
+  {id:'defense', nom:'DÉFENDRE', emoji:'🛡️'},
+  {id:'charge',  nom:'CHARGER MANA', emoji:'✨'},
+];
+
+/* ================= ETAT ================= */
+let client = null, codeSalon = null, statutConnexion = 'deconnecte';
+let elementChoisi = null;
+let moi = null;          // {id, nom, element}
+let joueurs = {};        // id -> {nom, element, pv, mana}
+let idAdversaire = null;
+let tourActuel = 1;
+let choixDuTour = {};    // {tour: {joueurId: action}}
+let monChoixCeTour = null;
+let journal = [];
+let dueleTermine = false;
+
+function topicJoueur(id){ return `${PREFIXE}/${codeSalon}/j/${id}`; }
+function topicChoix(){ return `${PREFIXE}/${codeSalon}/choix`; }
+
+/* ================= CONNEXION MQTT ================= */
+function connecterMQTT(code, apresConnexion){
+  codeSalon = code;
+  statutConnexion = 'connexion';
+  majBannieres();
+  client = mqtt.connect(MQTT_URL, { connectTimeout: 8000, reconnectPeriod: 2000 });
+  client.on('connect', ()=>{
+    statutConnexion = 'connecte';
+    majBannieres();
+    client.subscribe(`${PREFIXE}/${code}/#`);
+    if(moi) publierMonEtat();
+    if(apresConnexion) apresConnexion();
+  });
+  client.on('reconnect', ()=>{ statutConnexion='connexion'; majBannieres(); });
+  client.on('close', ()=>{ statutConnexion='deconnecte'; majBannieres(); });
+  client.on('error', ()=>{ statutConnexion='erreur'; majBannieres(); });
+  client.on('message', (topic, payload)=> traiterMessage(topic, payload.toString()));
+}
+function majBannieres(){
+  const textes = { connexion:'🟡 Connexion…', connecte:'🟢 Connecté', deconnecte:'⚪ Déconnecté', erreur:'🔴 Connexion impossible' };
+  const classes = { connecte:'connecte', erreur:'erreur' };
+  ['banniere-accueil','banniere-attente'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el){ el.textContent = textes[statutConnexion]; el.className='banniere-mode '+(classes[statutConnexion]||''); }
+  });
+}
+function traiterMessage(topic, payloadStr){
+  let data;
+  try{ data = payloadStr ? JSON.parse(payloadStr) : null; }catch(e){ return; }
+  if(topic === topicChoix()){
+    if(!data) return;
+    if(!choixDuTour[data.tour]) choixDuTour[data.tour] = {};
+    choixDuTour[data.tour][data.joueurId] = data.action;
+    tenterResolution(data.tour);
+    return;
+  }
+  const id = topic.split('/').pop();
+  if(data === null){ delete joueurs[id]; }
+  else{ joueurs[id] = data; if(moi && id !== moi.id) idAdversaire = id; }
+  gererArriveeJoueur();
+  rafraichirEcranActif();
+}
+function publierMonEtat(){
+  if(!client || !moi || statutConnexion!=='connecte') return;
+  client.publish(topicJoueur(moi.id), JSON.stringify(joueurs[moi.id]), { retain:true, qos:1 });
+}
+
+/* ================= ACCUEIL / SALON ================= */
+function construireGrilleElements(){
+  const conteneur = document.getElementById('grille-elements');
+  conteneur.innerHTML = '';
+  ELEMENTS.forEach(e=>{
+    const div = document.createElement('div');
+    div.className = 'carte-element';
+    div.style.setProperty('--e-couleur', e.couleur);
+    div.onclick = ()=>{ elementChoisi = e.id; document.querySelectorAll('.carte-element').forEach(el=>el.classList.remove('selection')); div.classList.add('selection'); };
+    div.innerHTML = `<div class="emoji">${e.emoji}</div><div class="nom" style="color:${e.couleur}">${e.nom}</div>`;
+    conteneur.appendChild(div);
+  });
+}
+construireGrilleElements();
+
+function verifierAvantConnexion(){
+  const pseudo = document.getElementById('champ-pseudo').value.trim();
+  if(!pseudo){ alert('Entre ton pseudo !'); return null; }
+  if(!elementChoisi){ alert('Choisis ton élément !'); return null; }
+  return pseudo;
+}
+function afficherChampRejoindre(){
+  document.getElementById('zone-rejoindre').style.display='block';
+}
+function creerSalon(){
+  const pseudo = verifierAvantConnexion();
+  if(!pseudo) return;
+  const code = String(Math.floor(1000 + Math.random()*9000));
+  moi = { id: pseudo.replace(/\s+/g,'')+'_'+Date.now(), nom:pseudo, element:elementChoisi };
+  joueurs[moi.id] = { nom:pseudo, element:elementChoisi, pv:PV_MAX, mana:0 };
+  document.getElementById('affiche-code-attente').textContent = code;
+  changerEcran('ecran-attente-salon');
+  connecterMQTT(code, ()=> publierMonEtat());
+}
+function rejoindreSalon(){
+  const pseudo = verifierAvantConnexion();
+  if(!pseudo) return;
+  const code = document.getElementById('champ-code-rejoindre').value.trim();
+  if(!/^[0-9]{4}$/.test(code)){ alert('Entre un code à 4 chiffres.'); return; }
+  moi = { id: pseudo.replace(/\s+/g,'')+'_'+Date.now(), nom:pseudo, element:elementChoisi };
+  joueurs[moi.id] = { nom:pseudo, element:elementChoisi, pv:PV_MAX, mana:0 };
+  document.getElementById('affiche-code-attente').textContent = code;
+  changerEcran('ecran-attente-salon');
+  connecterMQTT(code, ()=> publierMonEtat());
+}
+function gererArriveeJoueur(){
+  const ids = Object.keys(joueurs);
+  if(ids.length >= 2 && !idAdversaire){
+    idAdversaire = ids.find(id=>id!==moi.id);
+  }
+  if(ids.length >= 2 && idAdversaire && document.getElementById('ecran-attente-salon').classList.contains('actif')){
+    ajouterJournal(`⚔️ ${joueurs[moi.id].nom} affronte ${joueurs[idAdversaire].nom} !`);
+    changerEcran('ecran-duel');
+  }
+}
+
+/* ================= DEROULEMENT DU DUEL ================= */
+function construireGrilleActions(){
+  const conteneur = document.getElementById('grille-actions');
+  conteneur.innerHTML = '';
+  ACTIONS.forEach(a=>{
+    const div = document.createElement('div');
+    div.className = 'btn-choix';
+    div.id = 'action-'+a.id;
+    div.onclick = ()=> choisirAction(a.id);
+    div.innerHTML = `<span class="emoji">${a.emoji}</span>${a.nom}`;
+    conteneur.appendChild(div);
+  });
+}
+function choisirAction(actionId){
+  if(monChoixCeTour || dueleTermine) return;
+  monChoixCeTour = actionId;
+  document.querySelectorAll('.btn-choix').forEach(el=>{ el.classList.remove('selection'); el.classList.add('disabled'); el.style.pointerEvents='none'; });
+  document.getElementById('action-'+actionId).classList.add('selection');
+  document.getElementById('statut-choix').textContent = '⏳ En attente du choix de ton adversaire…';
+  client.publish(topicChoix(), JSON.stringify({ joueurId:moi.id, tour:tourActuel, action:actionId }), { qos:1 });
+  if(!choixDuTour[tourActuel]) choixDuTour[tourActuel] = {};
+  choixDuTour[tourActuel][moi.id] = actionId;
+  tenterResolution(tourActuel);
+}
+function tenterResolution(tour){
+  if(tour !== tourActuel || dueleTermine) return;
+  const choix = choixDuTour[tour];
+  if(!choix || !idAdversaire) return;
+  const actionMoi = choix[moi.id];
+  const actionAdv = choix[idAdversaire];
+  if(!actionMoi || !actionAdv) return;
+
+  resoudreTour(actionMoi, actionAdv);
+  tourActuel++;
+  monChoixCeTour = null;
+  rafraichirEcranActif();
+}
+function resoudreTour(actionMoi, actionAdv){
+  const moiData = joueurs[moi.id], advData = joueurs[idAdversaire];
+  const eMoi = getElement(moiData.element), eAdv = getElement(advData.element);
+  let degatsSurMoi = 0, degatsSurAdv = 0;
+  let texteMoi = '', texteAdv = '';
+
+  function calculerAttaque(attaquantData, eAttaquant, defenseurElement){
+    let base = Math.floor(Math.random()*(DEGATS_BASE[1]-DEGATS_BASE[0]+1))+DEGATS_BASE[0];
+    let mult = multiplicateurCycle(eAttaquant.id, defenseurElement);
+    let charge = false;
+    if(attaquantData.mana >= COUT_COUP_CHARGE){ attaquantData.mana -= COUT_COUP_CHARGE; mult *= 1.5; charge = true; }
+    return { degats: Math.round(base*mult), charge, avantage: mult>1 && !charge ? true : (mult>1) };
+  }
+
+  if(actionMoi==='attaque' && actionAdv==='attaque'){
+    const rMoi = calculerAttaque(moiData, eMoi, advData.element);
+    const rAdv = calculerAttaque(advData, eAdv, moiData.element);
+    degatsSurAdv = rMoi.degats; degatsSurMoi = rAdv.degats;
+    texteMoi = `⚔️ Vous vous attaquez tous les deux — tu infliges ${rMoi.degats}${rMoi.charge?' (coup chargé 💥)':''}, tu subis ${rAdv.degats}${rAdv.charge?' (coup chargé adverse 💥)':''}`;
+  } else if(actionMoi==='attaque' && actionAdv==='defense'){
+    const rMoi = calculerAttaque(moiData, eMoi, advData.element);
+    degatsSurAdv = Math.round(rMoi.degats*0.3);
+    advData.mana = Math.min(MANA_MAX, advData.mana + MANA_DEFENSE);
+    texteMoi = `⚔️ Tu attaques, ${advData.nom} se défend — seulement ${degatsSurAdv} dégâts passent`;
+  } else if(actionMoi==='defense' && actionAdv==='attaque'){
+    const rAdv = calculerAttaque(advData, eAdv, moiData.element);
+    degatsSurMoi = Math.round(rAdv.degats*0.3);
+    moiData.mana = Math.min(MANA_MAX, moiData.mana + MANA_DEFENSE);
+    texteMoi = `🛡️ Tu te défends, ${advData.nom} attaque — tu ne perds que ${degatsSurMoi} PV`;
+  } else if(actionMoi==='attaque' && actionAdv==='charge'){
+    const rMoi = calculerAttaque(moiData, eMoi, advData.element);
+    degatsSurAdv = Math.round(rMoi.degats*1.2);
+    advData.mana = Math.min(MANA_MAX, advData.mana + MANA_CHARGE_INTERROMPUE);
+    texteMoi = `⚔️ Tu surprends ${advData.nom} en pleine charge — ${degatsSurAdv} dégâts bonus !`;
+  } else if(actionMoi==='charge' && actionAdv==='attaque'){
+    const rAdv = calculerAttaque(advData, eAdv, moiData.element);
+    degatsSurMoi = Math.round(rAdv.degats*1.2);
+    moiData.mana = Math.min(MANA_MAX, moiData.mana + MANA_CHARGE_INTERROMPUE);
+    texteMoi = `✨ Tu es surpris en pleine charge par ${advData.nom} — tu subis ${degatsSurMoi} dégâts`;
+  } else if(actionMoi==='defense' && actionAdv==='defense'){
+    moiData.mana = Math.min(MANA_MAX, moiData.mana + MANA_DEFENSE);
+    advData.mana = Math.min(MANA_MAX, advData.mana + MANA_DEFENSE);
+    texteMoi = `🛡️🛡️ Vous vous défendez tous les deux — rien ne se passe`;
+  } else if(actionMoi==='charge' && actionAdv==='charge'){
+    moiData.mana = Math.min(MANA_MAX, moiData.mana + MANA_CHARGE);
+    advData.mana = Math.min(MANA_MAX, advData.mana + MANA_CHARGE);
+    texteMoi = `✨✨ Vous chargez tous les deux votre mana`;
+  } else if(actionMoi==='defense' && actionAdv==='charge'){
+    moiData.mana = Math.min(MANA_MAX, moiData.mana + MANA_DEFENSE);
+    advData.mana = Math.min(MANA_MAX, advData.mana + MANA_CHARGE);
+    texteMoi = `🛡️ Tu te défends pendant que ${advData.nom} charge son mana`;
+  } else if(actionMoi==='charge' && actionAdv==='defense'){
+    moiData.mana = Math.min(MANA_MAX, moiData.mana + MANA_CHARGE);
+    advData.mana = Math.min(MANA_MAX, advData.mana + MANA_DEFENSE);
+    texteMoi = `✨ Tu charges ton mana pendant que ${advData.nom} se défend`;
+  }
+
+  moiData.pv = Math.max(0, moiData.pv - degatsSurMoi);
+  advData.pv = Math.max(0, advData.pv - degatsSurAdv);
+
+  ajouterJournal(`Tour ${tourActuel} — ${texteMoi}`);
+  publierMonEtat();
+  if(navigator.vibrate && (degatsSurMoi>0 || degatsSurAdv>0)) navigator.vibrate(60);
+
+  document.getElementById('carte-moi').classList.add('impact');
+  document.getElementById('carte-adversaire').classList.add('impact');
+  setTimeout(()=>{ document.getElementById('carte-moi').classList.remove('impact'); document.getElementById('carte-adversaire').classList.remove('impact'); }, 400);
+
+  if(moiData.pv<=0 || advData.pv<=0){
+    dueleTermine = true;
+    setTimeout(()=>{
+      const gagnant = moiData.pv>0 ? moiData : (advData.pv>0 ? advData : null);
+      const titre = document.getElementById('titre-victoire');
+      const texte = document.getElementById('texte-victoire');
+      if(moiData.pv<=0 && advData.pv<=0){ titre.textContent='🤝 ÉGALITÉ'; texte.textContent='Vous êtes tombés au combat en même temps !'; }
+      else if(moiData.pv>0){ titre.textContent='🏆 VICTOIRE'; texte.textContent=`${moiData.nom} remporte le duel !`; }
+      else { titre.textContent='💀 DÉFAITE'; texte.textContent=`${advData.nom} remporte le duel !`; }
+      document.getElementById('overlay-victoire').classList.add('actif');
+    }, 500);
+  }
+}
+function ajouterJournal(texte){
+  journal.unshift({ t:texte, h:new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) });
+  journal = journal.slice(0,15);
+}
+
+/* ================= AFFICHAGE DUEL ================= */
+function afficherDuel(){
+  if(!document.getElementById('ecran-duel').classList.contains('actif')) return;
+  if(!idAdversaire || !joueurs[moi.id] || !joueurs[idAdversaire]) return;
+  const moiData = joueurs[moi.id], advData = joueurs[idAdversaire];
+  const eMoi = getElement(moiData.element), eAdv = getElement(advData.element);
+
+  document.getElementById('carte-moi').innerHTML = carteJoueurHTML(moiData, eMoi, 'Toi');
+  document.getElementById('carte-adversaire').innerHTML = carteJoueurHTML(advData, eAdv, advData.nom);
+  document.getElementById('affiche-tour').textContent = dueleTermine ? 'Duel terminé' : `Tour ${tourActuel}`;
+
+  if(!construireGrilleActions.faite){ construireGrilleActions(); construireGrilleActions.faite = true; }
+  document.querySelectorAll('.btn-choix').forEach(el=>{
+    el.style.pointerEvents = (monChoixCeTour || dueleTermine) ? 'none' : 'auto';
+    el.classList.toggle('selection', el.id === 'action-'+monChoixCeTour);
+  });
+  document.getElementById('statut-choix').textContent = dueleTermine ? '' : (monChoixCeTour ? '⏳ En attente du choix de ton adversaire…' : 'Choisis ton action !');
+
+  document.getElementById('zone-journal').innerHTML = journal.slice(0,10).map(j=>`<div class="journal-ligne"><b>${j.h}</b> — ${j.t}</div>`).join('') || '<div class="journal-ligne">Le duel commence…</div>';
+}
+function carteJoueurHTML(data, e, label){
+  const pct = Math.max(0, Math.round(data.pv/PV_MAX*100));
+  const pctMana = Math.round(data.mana/MANA_MAX*100);
+  return `<div class="emoji-elem">${e.emoji}</div><div class="nom-j" style="color:${e.couleur}">${label!=='Toi'?data.nom:'Toi'} · ${e.nom}</div>
+    <div class="etiquette">${data.pv} PV</div>
+    <div class="barre barre-pv"><div class="barre-remplie" style="width:${pct}%"></div></div>
+    <div class="etiquette">${data.mana} mana</div>
+    <div class="barre barre-mana"><div class="barre-remplie" style="width:${pctMana}%"></div></div>`;
+}
+
+/* ================= NAVIGATION ================= */
+function changerEcran(id){
+  document.querySelectorAll('.ecran').forEach(e=>e.classList.remove('actif'));
+  document.getElementById(id).classList.add('actif');
+  rafraichirEcranActif();
+}
+function rafraichirEcranActif(){
+  majBannieres();
+  if(document.getElementById('ecran-duel').classList.contains('actif')) afficherDuel();
+}
+window.addEventListener('beforeunload', ()=>{
+  if(client && moi){ try{ client.publish(topicJoueur(moi.id), '', { retain:true }); }catch(e){} }
+});
+</script>
+</body>
+</html>
